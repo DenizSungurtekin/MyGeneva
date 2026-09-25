@@ -34,8 +34,9 @@ class Event(SQLModel, table=True):
 
     image_url: Optional[str] = None
 
-    source: Optional[str] = None
+    source: Optional[str] = Field(default=None, index=True)
     source_url: Optional[str] = None
+    external_id: Optional[str] = Field(default=None, index=True)
     is_verified: bool = Field(default=False)
 
     created_at: datetime = Field(default_factory=_utcnow, nullable=False)

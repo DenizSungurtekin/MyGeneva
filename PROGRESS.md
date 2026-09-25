@@ -148,6 +148,53 @@ Refactor de l'app mobile pour supporter deux thèmes visuels côte à côte, ave
 - `tsc --noEmit --moduleResolution bundler --ignoreDeprecations 6.0` : les seules erreurs restantes sont préexistantes (`expo-constants` non résolu dans `src/api/client.ts`, confirmé sur `HEAD` avant les changements). Aucune erreur induite par le refactor de thème.
 - **Non testé sur device/simulateur** : je n'ai pas lancé Expo Go ni un simulateur pour valider visuellement le rendu ni le comportement du toggle. Le rendu final (contraste, lisibilité des polices Epilogue/Hanken Grotesk, position exacte du bouton dans le header) est à vérifier au premier `expo start`.
 
+## Ajout — 2026-09-26 : premier scraper réel (ladecadanse.ch)
+
+Première source de données live branchée. Le squelette pipeline est passé de "DAG démo sur données factices" à "aggrégateur fonctionnel end-to-end" pour un site.
+
+### Ce qui change
+
+- **Nouvelle source** : `ladecadanse` (soirée). Genre "Fêtes" uniquement pour la V1. Fenêtre par défaut J → J+7. Cron `0 6 * * *`.
+- **Registry déclaratif** : `pipeline/sources/registry.py` expose une liste `SOURCES: list[Source]` — chaque entrée relie une fonction scraper à ses métadonnées (kind, category_hint, trust, schedule, homepage). Ajouter une source = 1 fichier scraper + 1 entrée. Le DAG et le CLI itèrent dessus.
+- **Runner idempotent** : `pipeline/runner.py` fait fetch → upsert par `(source, external_id)` → log dans `scrape_runs`. Rerun sans duplicat (validé : 36 events insérés au run 1, 36 events mis à jour au run 2, 0 duplication).
+- **CLI local** : `python -m pipeline.run_source ladecadanse [--start YYYY-MM-DD] [--days 7]`.
+- **DAG Airflow** : `pipeline/dags/scrape_sources.py` — wrapper mince autour du runner, boucle sur le registry.
+
+### Schéma DB — migration `7e15486bd51c`
+
+- `events.external_id: Optional[str]` (+ index) — clé stable côté source pour dédoublonnage.
+- Index sur `events.source` — pour filtrer par source.
+- Table `scrape_runs` — trace par jour (source_name, target_date, url, parsed_count, inserted_count, updated_count, status, error, started_at/finished_at). `raw_html` prévu mais pas encore rempli par le scraper (cf. TODO ci-dessous).
+- `sources` enrichie : `enabled` (bool, défaut true), `homepage`, `category_hint`, `trust`, `schedule`, `last_error`, `records_last_run`. La colonne `enabled` permet de désactiver une source sans redéployer.
+
+Migration validée en cycle upgrade / downgrade / upgrade sur SQLite. Autogen Alembic + un ajustement manuel : `server_default=sa.true()` sur `enabled` pour ne pas casser les 3 lignes `sources` existantes.
+
+### Extraction ladecadanse
+
+- **URL** : `?courant=YYYY-MM-DD` (contrôle propre de la fenêtre).
+- **Sélecteurs** : `section.genre > h2[id=fetes]` → filtre de genre ; `article.evenement-short` → un event ; `#event-NNNNN` → `external_id`. `header.titre h3 a` → titre + URL. `header.titre span.right a` → lieu. `div.pratique span.left` → adresse. `div.event-media div.description p` → description. `div.event-media figure img` → image.
+- **Dates** : parsées depuis le lien Google Calendar Export du footer (format `dates=YYYYMMDDTHHMMSS/YYYYMMDDTHHMMSS`, Europe/Zurich → UTC). Plus fiable que le texte "HH:MM – HH:MM" qui n'a pas la date. Fallback : `target_date` local à 20:00 si le lien est absent.
+- **Rate limiting** : throttle module-level à `CRAWL_DELAY_S = 15` (valeur du robots.txt).
+- **User-Agent** : `MyGeneva/0.1 (aggregateur genevois; contact: mygeneva@gmail.com)`.
+
+### Validation
+
+- **13 tests pipeline verts** : parsing HTML (2 fetes retenus, 1 concert filtré), extraction champs, conversion horaires Europe/Zurich→UTC, fallback sans Google Calendar, mapping genre→category, idempotence sur 2 runs, log `scrape_runs` par jour, empty_days reportés, source disabled bypassée.
+- **26 tests backend toujours verts** (aucune régression).
+- **Smoke live** : `python -m pipeline.run_source ladecadanse --start 2026-09-26 --days 1` a récupéré 36 événements Fêtes réels et les a insérés en DB. Deuxième run immédiat → 0 insert, 36 updates, 0 duplication. UTF-8 propre (accents "Pâquis", "Désalpe" corrects en DB).
+
+### Éthique / droit
+
+Analyse juridique CH complète dans les échanges de session : robots.txt de ladecadanse.ch bloque nommément les crawlers IA (ClaudeBot, GPTBot, Perplexity…) — mention "editorial decision, not technical". Le droit CH ne reconnaît pas de "sui generis database right" (contrairement à l'UE), les faits (titre, date, lieu) ne sont pas protégés par la LDA, robots.txt n'a aucune valeur juridique. Angle d'attaque théorique : art. 5 LCD (concurrence déloyale), désamorcé par l'attribution + le lien retour vers ladecadanse.ch. **Zone verte** avec les précautions appliquées (UA identifié, crawl-delay respecté, stockage limité aux faits, attribution en app, suppression sur demande facile via `source_name`).
+
+### Non testé / TODO explicites
+
+- **Airflow** : DAG écrit, jamais exécuté (pas de Docker sur cette machine). Le fichier importe correctement (à valider dans l'UI Airflow au premier trigger). L'image aura besoin de `beautifulsoup4`, `lxml`, `httpx`, `sqlalchemy` via `_PIP_ADDITIONAL_REQUIREMENTS`.
+- **Fenêtre 7 jours en live** : validé sur 1 jour seulement pour le smoke. Le scraper `_throttle()` insère 15s entre chaque GET → une fenêtre 7j prend ~1min45. À exercer dans le prochain run.
+- **`raw_html`** dans `scrape_runs` : colonne prête mais non peuplée (paramètre `raw_html=None` dans `_log_run`). À activer avec purge (garder N dernières runs par source) sinon la table grossit vite (~1 MB par jour).
+- **Attribution en app mobile** : l'écran détail n'affiche pas encore "Source: La Décadanse ↗". À ajouter côté mobile.
+- **Autres sources** : la structure est prête, il ne reste qu'à écrire des scrapers additionnels (Ville de Genève opendata, Genève Tourisme, eventfrog).
+
 ## Journal chronologique
 
 - **Init** : lecture des 4 fichiers de contexte, création `.gitignore`, `PROGRESS.md`, structure de repo, commit initial.

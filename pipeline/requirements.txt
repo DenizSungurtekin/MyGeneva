@@ -1,0 +1,5 @@
+# Pipeline-specific deps (in addition to backend/requirements.txt).
+# Install into the same venv used to run the backend:
+#   pip install -r pipeline/requirements.txt
+beautifulsoup4>=4.13.0
+lxml>=5.3.0
