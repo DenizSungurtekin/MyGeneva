@@ -1,8 +1,8 @@
 import { Feather } from '@expo/vector-icons';
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { categoryAccent, colors, radius, spacing, text } from '../theme';
+import { radius, spacing, useTheme } from '../theme';
 import { RestaurantItem } from '../types/api';
 import { formatRating } from '../utils/format';
 import { FavoriteHeart } from './FavoriteHeart';
@@ -15,7 +15,51 @@ interface Props {
 }
 
 export function RestaurantCard({ restaurant, favorite, onPress, onToggleFavorite }: Props) {
-  const accent = categoryAccent.restaurant;
+  const { theme } = useTheme();
+  const accent = theme.categoryAccent.restaurant;
+
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        card: {
+          flexDirection: 'row',
+          gap: spacing.md,
+          alignItems: 'center',
+          padding: spacing.md,
+          marginHorizontal: spacing.lg,
+          marginBottom: spacing.sm,
+          backgroundColor: theme.colors.card,
+          borderColor: theme.colors.border,
+          borderWidth: 1,
+          borderRadius: radius.card,
+        },
+        icon: {
+          width: 44,
+          height: 44,
+          borderRadius: radius.pill,
+          borderWidth: 1,
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        body: {
+          flex: 1,
+        },
+        title: {
+          ...theme.text.bodyStrong,
+          fontSize: 16,
+          marginBottom: 2,
+        },
+        metaRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 4,
+        },
+        meta: {
+          ...theme.text.meta,
+        },
+      }),
+    [theme],
+  );
 
   return (
     <Pressable style={styles.card} onPress={onPress} accessibilityRole="button">
@@ -42,42 +86,3 @@ export function RestaurantCard({ restaurant, favorite, onPress, onToggleFavorite
     </Pressable>
   );
 }
-
-const styles = StyleSheet.create({
-  card: {
-    flexDirection: 'row',
-    gap: spacing.md,
-    alignItems: 'center',
-    padding: spacing.md,
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.sm,
-    backgroundColor: colors.card,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: radius.card,
-  },
-  icon: {
-    width: 44,
-    height: 44,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  body: {
-    flex: 1,
-  },
-  title: {
-    ...text.bodyStrong,
-    fontSize: 16,
-    marginBottom: 2,
-  },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  meta: {
-    ...text.meta,
-  },
-});

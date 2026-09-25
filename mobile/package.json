@@ -10,7 +10,9 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@expo-google-fonts/epilogue": "^0.2.3",
     "@expo-google-fonts/fraunces": "^0.2.3",
+    "@expo-google-fonts/hanken-grotesk": "^0.2.3",
     "@expo-google-fonts/work-sans": "^0.2.3",
     "@expo/vector-icons": "^15.1.1",
     "expo": "^57.0.24",

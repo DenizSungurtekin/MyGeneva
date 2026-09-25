@@ -119,6 +119,35 @@ docker compose up
 - Comptes stores Apple/Google (paiement) → prérequis à un build EAS Submit.
 - Hébergement backend (Railway / Render / Fly.io) — Postgres managé et déploiement continu.
 
+## Ajout — 2026-09-26 : deuxième thème "Nuit Douce" + bouton toggle
+
+Refactor de l'app mobile pour supporter deux thèmes visuels côte à côte, avec un bouton de bascule dans le header de l'écran Accueil (icône lune/soleil).
+
+### Ce qui change
+- **Deux thèmes** exposés : `lightTheme` (thème d'origine, ivoire + terracotta, Fraunces + Work Sans) et `darkTheme` (Nuit Douce, palette #17181C / accents chauds, Epilogue + Hanken Grotesk).
+- **Défaut au démarrage** : `light` (thème d'origine). Le choix **n'est pas persisté** entre lancements (AsyncStorage volontairement pas introduit, restart = light).
+- **Bouton toggle** : icône Feather `moon`/`sun` en haut à droite de l'écran d'accueil.
+- **Nouvelles polices** : `@expo-google-fonts/epilogue` et `@expo-google-fonts/hanken-grotesk` ajoutées et installées (`npm install` a réussi). Fraunces + Work Sans sont conservées pour le thème light. Les 4 familles sont chargées au démarrage.
+- **Architecture** : `src/theme/themes.ts` + `src/theme/ThemeContext.tsx` (`ThemeProvider` + `useTheme()`). Chaque composant a été refactor pour créer ses `StyleSheet` via `useMemo(() => StyleSheet.create({...}), [theme])` — les styles étaient auparavant figés au chargement du module. `src/theme/typography.ts` supprimé (fusionné dans `themes.ts`).
+- **StatusBar** : `style` dynamique (`dark` en light, `light` en dark).
+- **Corrections d'appearance** : la couleur du cœur favori et l'accent principal sont maintenant deux tokens distincts (`favoriteHeart` vs `accentJournee`) ; les pastilles actives de CategoryTabs et DayPicker utilisent l'inversion texte↔fond au lieu de l'accent (conforme à la spec du prototype).
+
+### Fichiers touchés
+- `mobile/package.json` (ajout deps + `npm install`)
+- `mobile/App.tsx` (chargement 4 familles de polices, wrap `ThemeProvider`)
+- `mobile/src/theme/` : `themes.ts` (nouveau), `ThemeContext.tsx` (nouveau), `colors.ts` (réduit à `CategoryKey` + `categoryLabel`), `typography.ts` (supprimé), `index.ts` (mis à jour)
+- `mobile/src/components/` : `CategoryTabs.tsx`, `DayPicker.tsx`, `EventCard.tsx`, `FavoriteHeart.tsx`, `NavBar.tsx`, `Placeholder.tsx`, `RestaurantCard.tsx`, `SectionHeader.tsx`, `Tag.tsx`
+- `mobile/src/screens/` : `HomeScreen.tsx` (+ toggle button), `ListScreen.tsx`, `DetailScreen.tsx`, `FavoritesScreen.tsx`
+
+### Ce qui **ne** change **pas**
+- `app.json` — le splash reste `#FAF6F0` puisque le démarrage utilise le thème light par défaut.
+- Les composants, la navigation, l'API, `AppContext`, les seeds : intacts.
+
+### Validation
+- `npm install` OK (2 packages ajoutés).
+- `tsc --noEmit --moduleResolution bundler --ignoreDeprecations 6.0` : les seules erreurs restantes sont préexistantes (`expo-constants` non résolu dans `src/api/client.ts`, confirmé sur `HEAD` avant les changements). Aucune erreur induite par le refactor de thème.
+- **Non testé sur device/simulateur** : je n'ai pas lancé Expo Go ni un simulateur pour valider visuellement le rendu ni le comportement du toggle. Le rendu final (contraste, lisibilité des polices Epilogue/Hanken Grotesk, position exacte du bouton dans le header) est à vérifier au premier `expo start`.
+
 ## Journal chronologique
 
 - **Init** : lecture des 4 fichiers de contexte, création `.gitignore`, `PROGRESS.md`, structure de repo, commit initial.

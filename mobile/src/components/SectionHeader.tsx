@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { colors, spacing, text } from '../theme';
+import { spacing, useTheme } from '../theme';
 
 interface Props {
   title: string;
@@ -10,6 +10,29 @@ interface Props {
 }
 
 export function SectionHeader({ title, actionLabel, onAction }: Props) {
+  const { theme } = useTheme();
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        container: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          paddingHorizontal: spacing.lg,
+          marginTop: spacing.lg,
+          marginBottom: spacing.sm,
+        },
+        title: {
+          ...theme.text.h3,
+        },
+        action: {
+          ...theme.text.metaStrong,
+          color: theme.colors.accentJournee,
+          textDecorationLine: 'underline',
+        },
+      }),
+    [theme],
+  );
   return (
     <View style={styles.container}>
       <Text style={styles.title}>{title}</Text>
@@ -21,22 +44,3 @@ export function SectionHeader({ title, actionLabel, onAction }: Props) {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    marginTop: spacing.lg,
-    marginBottom: spacing.sm,
-  },
-  title: {
-    ...text.h3,
-  },
-  action: {
-    ...text.metaStrong,
-    color: colors.text,
-    textDecorationLine: 'underline',
-  },
-});

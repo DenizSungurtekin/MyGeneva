@@ -1,5 +1,6 @@
+import { Feather } from '@expo/vector-icons';
 import React, { useMemo } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { CategoryTabs } from '../components/CategoryTabs';
 import { DayPicker } from '../components/DayPicker';
@@ -7,7 +8,7 @@ import { EventCard } from '../components/EventCard';
 import { RestaurantCard } from '../components/RestaurantCard';
 import { SectionHeader } from '../components/SectionHeader';
 import { useApp } from '../state/AppContext';
-import { colors, spacing, text } from '../theme';
+import { spacing, useTheme } from '../theme';
 import { EventCategory } from '../types/api';
 import { longDayLabel } from '../utils/date';
 
@@ -28,6 +29,7 @@ export function HomeScreen() {
     openDetail,
     setScreen,
   } = useApp();
+  const { theme, mode, toggle } = useTheme();
 
   const targetCategory = category === 'restaurant' ? null : (category as EventCategory);
 
@@ -39,14 +41,76 @@ export function HomeScreen() {
   const preview = items.slice(0, PREVIEW_LIMIT);
   const isLoading = category === 'restaurant' ? restaurantsLoading : eventsLoading;
 
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        content: {
+          paddingTop: spacing.md,
+          paddingBottom: spacing.xxl,
+        },
+        header: {
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
+          paddingHorizontal: spacing.lg,
+          marginBottom: spacing.md,
+        },
+        headerText: {
+          flex: 1,
+        },
+        headerTitle: {
+          ...theme.text.h1,
+          marginTop: spacing.xxs,
+          textTransform: 'capitalize',
+        },
+        themeToggle: {
+          width: 40,
+          height: 40,
+          borderRadius: 20,
+          borderWidth: 1,
+          borderColor: theme.colors.border,
+          backgroundColor: theme.colors.soft,
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginLeft: spacing.sm,
+          marginTop: 2,
+        },
+        loader: {
+          marginTop: spacing.lg,
+        },
+        emptyText: {
+          ...theme.text.body,
+          color: theme.colors.textMuted,
+          paddingHorizontal: spacing.lg,
+          marginTop: spacing.sm,
+        },
+      }),
+    [theme],
+  );
+
   return (
     <ScrollView
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
     >
       <View style={styles.header}>
-        <Text style={text.eyebrow}>Aujourd'hui à Genève</Text>
-        <Text style={styles.headerTitle}>{longDayLabel(selectedDay)}</Text>
+        <View style={styles.headerText}>
+          <Text style={theme.text.eyebrow}>Aujourd'hui à Genève</Text>
+          <Text style={styles.headerTitle}>{longDayLabel(selectedDay)}</Text>
+        </View>
+        <Pressable
+          onPress={toggle}
+          style={styles.themeToggle}
+          accessibilityRole="button"
+          accessibilityLabel={mode === 'dark' ? 'Passer en thème clair' : 'Passer en thème sombre'}
+          hitSlop={6}
+        >
+          <Feather
+            name={mode === 'dark' ? 'sun' : 'moon'}
+            size={18}
+            color={theme.colors.text}
+          />
+        </Pressable>
       </View>
 
       <DayPicker value={selectedDay} onChange={setSelectedDay} />
@@ -61,7 +125,7 @@ export function HomeScreen() {
       />
 
       {isLoading ? (
-        <ActivityIndicator style={styles.loader} color={colors.text} />
+        <ActivityIndicator style={styles.loader} color={theme.colors.text} />
       ) : preview.length === 0 ? (
         <Text style={styles.emptyText}>
           Rien à afficher pour cette catégorie. Ajoute des données via le seed backend.
@@ -99,28 +163,3 @@ export function HomeScreen() {
     </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  content: {
-    paddingTop: spacing.md,
-    paddingBottom: spacing.xxl,
-  },
-  header: {
-    paddingHorizontal: spacing.lg,
-    marginBottom: spacing.md,
-  },
-  headerTitle: {
-    ...text.h1,
-    marginTop: spacing.xxs,
-    textTransform: 'capitalize',
-  },
-  loader: {
-    marginTop: spacing.lg,
-  },
-  emptyText: {
-    ...text.body,
-    color: colors.textMuted,
-    paddingHorizontal: spacing.lg,
-    marginTop: spacing.sm,
-  },
-});

@@ -6,7 +6,7 @@ import { CategoryTabs } from '../components/CategoryTabs';
 import { EventCard } from '../components/EventCard';
 import { RestaurantCard } from '../components/RestaurantCard';
 import { useApp } from '../state/AppContext';
-import { categoryLabel, colors, spacing, text } from '../theme';
+import { categoryLabel, spacing, useTheme } from '../theme';
 import { EventItem, RestaurantItem } from '../types/api';
 import { longDayLabel } from '../utils/date';
 
@@ -28,6 +28,7 @@ export function ListScreen() {
     openDetail,
     setScreen,
   } = useApp();
+  const { theme } = useTheme();
 
   const data: ListItem[] = useMemo(() => {
     if (category === 'restaurant') {
@@ -40,6 +41,41 @@ export function ListScreen() {
 
   const isLoading = category === 'restaurant' ? restaurantsLoading : eventsLoading;
 
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        container: {
+          flex: 1,
+        },
+        header: {
+          flexDirection: 'row',
+          alignItems: 'flex-end',
+          gap: spacing.sm,
+          paddingHorizontal: spacing.lg,
+          paddingTop: spacing.md,
+          paddingBottom: spacing.md,
+        },
+        back: {
+          marginRight: spacing.xs,
+          marginBottom: 2,
+        },
+        title: {
+          ...theme.text.h1,
+          marginTop: spacing.xxs,
+        },
+        loader: {
+          marginTop: spacing.lg,
+        },
+        empty: {
+          ...theme.text.body,
+          color: theme.colors.textMuted,
+          paddingHorizontal: spacing.lg,
+          marginTop: spacing.lg,
+        },
+      }),
+    [theme],
+  );
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -50,10 +86,10 @@ export function ListScreen() {
           accessibilityLabel="Retour"
           hitSlop={8}
         >
-          <Feather name="arrow-left" size={22} color={colors.text} />
+          <Feather name="arrow-left" size={22} color={theme.colors.text} />
         </Pressable>
         <View style={{ flex: 1 }}>
-          <Text style={text.eyebrow}>
+          <Text style={theme.text.eyebrow}>
             {category === 'restaurant' ? 'Restaurants' : longDayLabel(selectedDay)}
           </Text>
           <Text style={styles.title}>{categoryLabel[category]}</Text>
@@ -65,7 +101,7 @@ export function ListScreen() {
       </View>
 
       {isLoading ? (
-        <ActivityIndicator style={styles.loader} color={colors.text} />
+        <ActivityIndicator style={styles.loader} color={theme.colors.text} />
       ) : (
         <FlatList
           data={data}
@@ -103,34 +139,3 @@ export function ListScreen() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.md,
-  },
-  back: {
-    marginRight: spacing.xs,
-    marginBottom: 2,
-  },
-  title: {
-    ...text.h1,
-    marginTop: spacing.xxs,
-  },
-  loader: {
-    marginTop: spacing.lg,
-  },
-  empty: {
-    ...text.body,
-    color: colors.textMuted,
-    paddingHorizontal: spacing.lg,
-    marginTop: spacing.lg,
-  },
-});

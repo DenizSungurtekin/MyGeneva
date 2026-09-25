@@ -1,5 +1,5 @@
 import { Feather } from '@expo/vector-icons';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -15,13 +15,14 @@ import { Tag } from '../components/Tag';
 import { eventsApi } from '../api/events';
 import { restaurantsApi } from '../api/restaurants';
 import { useApp } from '../state/AppContext';
-import { categoryAccent, categoryLabel, colors, radius, spacing, text } from '../theme';
+import { categoryLabel, radius, spacing, useTheme } from '../theme';
 import { EventItem, RestaurantItem } from '../types/api';
 import { longDayLabel, timeRange } from '../utils/date';
 import { formatRating } from '../utils/format';
 
 export function DetailScreen() {
   const { detail, closeDetail, isFavorite, toggleFavorite } = useApp();
+  const { theme } = useTheme();
   const [event, setEvent] = useState<EventItem | null>(null);
   const [restaurant, setRestaurant] = useState<RestaurantItem | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -51,15 +52,110 @@ export function DetailScreen() {
     };
   }, [detail]);
 
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        container: {
+          flex: 1,
+          backgroundColor: theme.colors.background,
+        },
+        header: {
+          position: 'relative',
+        },
+        backButton: {
+          position: 'absolute',
+          top: spacing.lg,
+          left: spacing.lg,
+          width: 40,
+          height: 40,
+          borderRadius: 20,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: theme.colors.overlayCircle,
+          borderWidth: 1,
+          borderColor: theme.colors.border,
+        },
+        heart: {
+          position: 'absolute',
+          top: spacing.lg,
+          right: spacing.lg,
+        },
+        body: {
+          paddingHorizontal: spacing.lg,
+          paddingTop: spacing.lg,
+          gap: spacing.xs,
+        },
+        title: {
+          ...theme.text.h1,
+          marginTop: spacing.xs,
+          marginBottom: spacing.xs,
+        },
+        metaRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 6,
+        },
+        metaText: {
+          ...theme.text.meta,
+        },
+        description: {
+          ...theme.text.body,
+          color: theme.colors.textSecondary,
+          marginTop: spacing.md,
+        },
+        map: {
+          marginTop: spacing.md,
+          height: 120,
+          backgroundColor: theme.colors.lieuCard,
+          borderColor: theme.colors.border,
+          borderWidth: 1,
+          borderRadius: radius.card,
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        footer: {
+          position: 'absolute',
+          left: spacing.lg,
+          right: spacing.lg,
+          bottom: spacing.lg,
+          flexDirection: 'row',
+          gap: spacing.sm,
+        },
+        button: {
+          flex: 1,
+          flexDirection: 'row',
+          justifyContent: 'center',
+          alignItems: 'center',
+          gap: 8,
+          height: 48,
+          borderRadius: radius.pill,
+        },
+        buttonSecondary: {
+          backgroundColor: theme.colors.card,
+          borderWidth: 1,
+          borderColor: theme.colors.border,
+        },
+        buttonPrimary: {
+          backgroundColor: theme.colors.accentJournee,
+        },
+        error: {
+          ...theme.text.body,
+          color: theme.colors.textMuted,
+          padding: spacing.lg,
+        },
+      }),
+    [theme],
+  );
+
   if (!detail) return null;
 
   const favorite = isFavorite(detail.type, detail.id);
   const accent =
     detail.type === 'restaurant'
-      ? categoryAccent.restaurant
+      ? theme.categoryAccent.restaurant
       : event?.category === 'soiree'
-        ? categoryAccent.soiree
-        : categoryAccent.journee;
+        ? theme.categoryAccent.soiree
+        : theme.categoryAccent.journee;
 
   const loading = detail.type === 'event' ? !event : !restaurant;
 
@@ -78,7 +174,7 @@ export function DetailScreen() {
             accessibilityRole="button"
             accessibilityLabel="Retour"
           >
-            <Feather name="arrow-left" size={20} color={colors.text} />
+            <Feather name="arrow-left" size={20} color={theme.colors.text} />
           </Pressable>
           <FavoriteHeart
             active={favorite}
@@ -89,7 +185,7 @@ export function DetailScreen() {
         </View>
 
         {loading ? (
-          <ActivityIndicator style={{ marginTop: spacing.xl }} color={colors.text} />
+          <ActivityIndicator style={{ marginTop: spacing.xl }} color={theme.colors.text} />
         ) : error ? (
           <Text style={styles.error}>{error}</Text>
         ) : detail.type === 'event' && event ? (
@@ -100,13 +196,13 @@ export function DetailScreen() {
             />
             <Text style={styles.title}>{event.title}</Text>
             <View style={styles.metaRow}>
-              <Feather name="clock" size={14} color={colors.textMuted} />
+              <Feather name="clock" size={14} color={theme.colors.textMuted} />
               <Text style={styles.metaText}>
                 {longDayLabel(new Date(event.date_start))} · {timeRange(event.date_start, event.date_end)}
               </Text>
             </View>
             <View style={styles.metaRow}>
-              <Feather name="map-pin" size={14} color={colors.textMuted} />
+              <Feather name="map-pin" size={14} color={theme.colors.textMuted} />
               <Text style={styles.metaText}>{event.location_name || event.address || 'Genève'}</Text>
             </View>
             <Text style={styles.description}>{event.description || 'Pas de description.'}</Text>
@@ -124,14 +220,14 @@ export function DetailScreen() {
               </Text>
             </View>
             <View style={styles.metaRow}>
-              <Feather name="map-pin" size={14} color={colors.textMuted} />
+              <Feather name="map-pin" size={14} color={theme.colors.textMuted} />
               <Text style={styles.metaText}>
                 {restaurant.location_name || restaurant.address || 'Genève'}
               </Text>
             </View>
             {restaurant.opening_hours ? (
               <View style={styles.metaRow}>
-                <Feather name="clock" size={14} color={colors.textMuted} />
+                <Feather name="clock" size={14} color={theme.colors.textMuted} />
                 <Text style={styles.metaText}>{restaurant.opening_hours}</Text>
               </View>
             ) : null}
@@ -146,16 +242,16 @@ export function DetailScreen() {
 
       <View style={styles.footer}>
         <Pressable style={[styles.button, styles.buttonSecondary]} accessibilityRole="button">
-          <Feather name="navigation" size={16} color={colors.text} />
-          <Text style={[text.button, { color: colors.text }]}>Itinéraire</Text>
+          <Feather name="navigation" size={16} color={theme.colors.text} />
+          <Text style={[theme.text.button, { color: theme.colors.text }]}>Itinéraire</Text>
         </Pressable>
         <Pressable
-          style={[styles.button, { backgroundColor: accent }]}
+          style={[styles.button, styles.buttonPrimary]}
           onPress={() => toggleFavorite(detail.type, detail.id)}
           accessibilityRole="button"
         >
-          <Feather name="heart" size={16} color={colors.card} />
-          <Text style={text.button}>
+          <Feather name="heart" size={16} color={theme.colors.ctaText} />
+          <Text style={theme.text.button}>
             {favorite ? 'Ajouté aux favoris' : 'Ajouter aux favoris'}
           </Text>
         </Pressable>
@@ -165,106 +261,37 @@ export function DetailScreen() {
 }
 
 function Section({ title, body }: { title: string; body: string }) {
+  const { theme } = useTheme();
   return (
     <View style={{ marginTop: spacing.lg }}>
-      <Text style={text.eyebrow}>{title}</Text>
-      <Text style={[text.body, { marginTop: spacing.xxs }]}>{body}</Text>
+      <Text style={theme.text.eyebrow}>{title}</Text>
+      <Text style={[theme.text.body, { marginTop: spacing.xxs }]}>{body}</Text>
     </View>
   );
 }
 
 function MapPlaceholder() {
+  const { theme } = useTheme();
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        map: {
+          marginTop: spacing.md,
+          height: 120,
+          backgroundColor: theme.colors.lieuCard,
+          borderColor: theme.colors.border,
+          borderWidth: 1,
+          borderRadius: radius.card,
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+      }),
+    [theme],
+  );
   return (
     <View style={styles.map}>
-      <Feather name="map" size={28} color={colors.textMuted} />
-      <Text style={[text.meta, { marginTop: spacing.xxs }]}>Carte à venir</Text>
+      <Feather name="map" size={28} color={theme.colors.textMuted} />
+      <Text style={[theme.text.meta, { marginTop: spacing.xxs }]}>Carte à venir</Text>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  header: {
-    position: 'relative',
-  },
-  backButton: {
-    position: 'absolute',
-    top: spacing.lg,
-    left: spacing.lg,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.92)',
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  heart: {
-    position: 'absolute',
-    top: spacing.lg,
-    right: spacing.lg,
-  },
-  body: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
-    gap: spacing.xs,
-  },
-  title: {
-    ...text.h1,
-    marginTop: spacing.xs,
-    marginBottom: spacing.xs,
-  },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  metaText: {
-    ...text.meta,
-  },
-  description: {
-    ...text.body,
-    marginTop: spacing.md,
-  },
-  map: {
-    marginTop: spacing.md,
-    height: 120,
-    backgroundColor: colors.card,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: radius.card,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  footer: {
-    position: 'absolute',
-    left: spacing.lg,
-    right: spacing.lg,
-    bottom: spacing.lg,
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  button: {
-    flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 8,
-    height: 48,
-    borderRadius: radius.pill,
-  },
-  buttonSecondary: {
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  error: {
-    ...text.body,
-    color: colors.textMuted,
-    padding: spacing.lg,
-  },
-});

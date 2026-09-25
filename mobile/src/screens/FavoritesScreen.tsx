@@ -5,7 +5,7 @@ import { ActivityIndicator, FlatList, StyleSheet, Text, View } from 'react-nativ
 import { EventCard } from '../components/EventCard';
 import { RestaurantCard } from '../components/RestaurantCard';
 import { useApp } from '../state/AppContext';
-import { colors, spacing, text } from '../theme';
+import { spacing, useTheme } from '../theme';
 import { EventItem, RestaurantItem } from '../types/api';
 
 type Row =
@@ -21,6 +21,7 @@ export function FavoritesScreen() {
     toggleFavorite,
     openDetail,
   } = useApp();
+  const { theme } = useTheme();
 
   const rows: Row[] = useMemo(() => {
     const combined: Row[] = [
@@ -30,18 +31,53 @@ export function FavoritesScreen() {
     return combined;
   }, [favoriteEvents, favoriteRestaurants]);
 
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        container: {
+          flex: 1,
+        },
+        header: {
+          paddingHorizontal: spacing.lg,
+          paddingTop: spacing.md,
+          marginBottom: spacing.lg,
+        },
+        title: {
+          ...theme.text.h1,
+          marginTop: spacing.xxs,
+        },
+        empty: {
+          flex: 1,
+          alignItems: 'center',
+          justifyContent: 'center',
+          paddingHorizontal: spacing.xl,
+          gap: spacing.xs,
+        },
+        emptyTitle: {
+          ...theme.text.h3,
+          marginTop: spacing.sm,
+        },
+        emptyBody: {
+          ...theme.text.body,
+          color: theme.colors.textMuted,
+          textAlign: 'center',
+        },
+      }),
+    [theme],
+  );
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={text.eyebrow}>Sauvegardés</Text>
+        <Text style={theme.text.eyebrow}>Sauvegardés</Text>
         <Text style={styles.title}>Favoris</Text>
       </View>
 
       {favoritesLoading ? (
-        <ActivityIndicator style={{ marginTop: spacing.lg }} color={colors.text} />
+        <ActivityIndicator style={{ marginTop: spacing.lg }} color={theme.colors.text} />
       ) : rows.length === 0 ? (
         <View style={styles.empty}>
-          <Feather name="heart" size={32} color={colors.textMuted} />
+          <Feather name="heart" size={32} color={theme.colors.textMuted} />
           <Text style={styles.emptyTitle}>Aucun favori pour l'instant</Text>
           <Text style={styles.emptyBody}>
             Appuie sur le cœur d'un événement ou d'un restaurant pour le retrouver ici.
@@ -78,34 +114,3 @@ export function FavoritesScreen() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  header: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-    marginBottom: spacing.lg,
-  },
-  title: {
-    ...text.h1,
-    marginTop: spacing.xxs,
-  },
-  empty: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: spacing.xl,
-    gap: spacing.xs,
-  },
-  emptyTitle: {
-    ...text.h3,
-    marginTop: spacing.sm,
-  },
-  emptyBody: {
-    ...text.body,
-    color: colors.textMuted,
-    textAlign: 'center',
-  },
-});

@@ -1,7 +1,7 @@
-import React, { useMemo, useRef, useEffect } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { colors, radius, spacing, text } from '../theme';
+import { radius, spacing, useTheme } from '../theme';
 import { buildDayStrip, isSameDay, shortDayLabel } from '../utils/date';
 
 interface Props {
@@ -11,7 +11,10 @@ interface Props {
   after?: number;
 }
 
+const PILL_WIDTH = 60;
+
 export function DayPicker({ value, onChange, before = 3, after = 14 }: Props) {
+  const { theme } = useTheme();
   const today = useMemo(() => {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
@@ -22,13 +25,52 @@ export function DayPicker({ value, onChange, before = 3, after = 14 }: Props) {
 
   const scrollRef = useRef<ScrollView>(null);
   useEffect(() => {
-    // Center-ish the selected day on mount.
     const index = days.findIndex((d) => isSameDay(d, value));
     if (index >= 0 && scrollRef.current) {
-      const PILL_WIDTH = 68;
-      scrollRef.current.scrollTo({ x: Math.max(0, (index - 2) * PILL_WIDTH), animated: false });
+      const OFFSET_WIDTH = 68;
+      scrollRef.current.scrollTo({ x: Math.max(0, (index - 2) * OFFSET_WIDTH), animated: false });
     }
   }, [days, value]);
+
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        container: {
+          paddingHorizontal: spacing.lg,
+          gap: spacing.xs,
+        },
+        pill: {
+          width: PILL_WIDTH,
+          paddingVertical: spacing.xs,
+          borderRadius: radius.chip,
+          borderWidth: 1,
+          borderColor: theme.colors.border,
+          backgroundColor: theme.colors.soft,
+          alignItems: 'center',
+        },
+        pillActive: {
+          backgroundColor: theme.colors.text,
+          borderColor: theme.colors.text,
+        },
+        weekday: {
+          ...theme.text.eyebrow,
+          color: theme.colors.textMuted,
+        },
+        weekdayActive: {
+          color: theme.colors.background,
+        },
+        day: {
+          ...theme.text.h3,
+          fontSize: 20,
+          color: theme.colors.text,
+          marginTop: 2,
+        },
+        dayActive: {
+          color: theme.colors.background,
+        },
+      }),
+    [theme],
+  );
 
   return (
     <ScrollView
@@ -59,41 +101,3 @@ export function DayPicker({ value, onChange, before = 3, after = 14 }: Props) {
     </ScrollView>
   );
 }
-
-const PILL_WIDTH = 60;
-
-const styles = StyleSheet.create({
-  container: {
-    paddingHorizontal: spacing.lg,
-    gap: spacing.xs,
-  },
-  pill: {
-    width: PILL_WIDTH,
-    paddingVertical: spacing.xs,
-    borderRadius: radius.chip,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.card,
-    alignItems: 'center',
-  },
-  pillActive: {
-    backgroundColor: colors.text,
-    borderColor: colors.text,
-  },
-  weekday: {
-    ...text.eyebrow,
-    color: colors.textMuted,
-  },
-  weekdayActive: {
-    color: colors.card,
-  },
-  day: {
-    ...text.h3,
-    fontSize: 20,
-    color: colors.text,
-    marginTop: 2,
-  },
-  dayActive: {
-    color: colors.card,
-  },
-});

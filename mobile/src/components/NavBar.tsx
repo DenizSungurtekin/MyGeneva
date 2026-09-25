@@ -1,9 +1,9 @@
 import { Feather } from '@expo/vector-icons';
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { colors, spacing, text } from '../theme';
+import { spacing, useTheme } from '../theme';
 import { ScreenName, useApp } from '../state/AppContext';
 
 const TABS: { key: ScreenName; label: string; icon: keyof typeof Feather.glyphMap }[] = [
@@ -13,8 +13,37 @@ const TABS: { key: ScreenName; label: string; icon: keyof typeof Feather.glyphMa
 
 export function NavBar() {
   const { screen, setScreen } = useApp();
+  const { theme } = useTheme();
   const insets = useSafeAreaInsets();
   const active: ScreenName = screen === 'liste' || screen === 'detail' ? 'accueil' : screen;
+
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        container: {
+          flexDirection: 'row',
+          borderTopColor: theme.colors.border,
+          borderTopWidth: 1,
+          backgroundColor: theme.colors.card,
+          paddingTop: spacing.xs,
+        },
+        tab: {
+          flex: 1,
+          alignItems: 'center',
+          gap: 2,
+          paddingVertical: spacing.xs,
+        },
+        label: {
+          ...theme.text.meta,
+          fontSize: 11,
+          color: theme.colors.navInactive,
+        },
+        labelActive: {
+          color: theme.colors.text,
+        },
+      }),
+    [theme],
+  );
 
   return (
     <View style={[styles.container, { paddingBottom: Math.max(insets.bottom, spacing.sm) }]}>
@@ -31,7 +60,7 @@ export function NavBar() {
             <Feather
               name={tab.icon}
               size={22}
-              color={isActive ? colors.text : colors.textMuted}
+              color={isActive ? theme.colors.text : theme.colors.navInactive}
             />
             <Text style={[styles.label, isActive && styles.labelActive]}>{tab.label}</Text>
           </Pressable>
@@ -40,27 +69,3 @@ export function NavBar() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flexDirection: 'row',
-    borderTopColor: colors.border,
-    borderTopWidth: 1,
-    backgroundColor: colors.card,
-    paddingTop: spacing.xs,
-  },
-  tab: {
-    flex: 1,
-    alignItems: 'center',
-    gap: 2,
-    paddingVertical: spacing.xs,
-  },
-  label: {
-    ...text.meta,
-    fontSize: 11,
-    color: colors.textMuted,
-  },
-  labelActive: {
-    color: colors.text,
-  },
-});

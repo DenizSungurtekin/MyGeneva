@@ -1,8 +1,7 @@
-import React from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
-import { Text } from 'react-native';
+import React, { useMemo } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { categoryAccent, CategoryKey, categoryLabel, colors, radius, spacing, text } from '../theme';
+import { categoryLabel, CategoryKey, radius, spacing, useTheme } from '../theme';
 
 const ORDER: CategoryKey[] = ['journee', 'soiree', 'restaurant'];
 
@@ -12,6 +11,38 @@ interface Props {
 }
 
 export function CategoryTabs({ value, onChange }: Props) {
+  const { theme } = useTheme();
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        container: {
+          flexDirection: 'row',
+          gap: spacing.xs,
+          paddingHorizontal: spacing.lg,
+        },
+        tab: {
+          paddingHorizontal: spacing.md,
+          paddingVertical: spacing.xs,
+          borderRadius: radius.pill,
+          borderWidth: 1,
+          borderColor: theme.colors.border,
+          backgroundColor: theme.colors.soft,
+        },
+        tabActive: {
+          backgroundColor: theme.colors.text,
+          borderColor: theme.colors.text,
+        },
+        label: {
+          ...theme.text.metaStrong,
+          color: theme.colors.text,
+        },
+        labelActive: {
+          color: theme.colors.background,
+        },
+      }),
+    [theme],
+  );
+
   return (
     <View style={styles.container}>
       {ORDER.map((key) => {
@@ -20,10 +51,7 @@ export function CategoryTabs({ value, onChange }: Props) {
           <Pressable
             key={key}
             onPress={() => onChange(key)}
-            style={[
-              styles.tab,
-              active && { backgroundColor: categoryAccent[key], borderColor: categoryAccent[key] },
-            ]}
+            style={[styles.tab, active && styles.tabActive]}
             accessibilityRole="tab"
             accessibilityState={{ selected: active }}
           >
@@ -36,26 +64,3 @@ export function CategoryTabs({ value, onChange }: Props) {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flexDirection: 'row',
-    gap: spacing.xs,
-    paddingHorizontal: spacing.lg,
-  },
-  tab: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.card,
-  },
-  label: {
-    ...text.metaStrong,
-    color: colors.text,
-  },
-  labelActive: {
-    color: colors.card,
-  },
-});

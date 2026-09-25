@@ -2,7 +2,7 @@ import { Feather } from '@expo/vector-icons';
 import React from 'react';
 import { Pressable, StyleSheet, ViewStyle } from 'react-native';
 
-import { colors, radius } from '../theme';
+import { radius, useTheme } from '../theme';
 
 interface Props {
   active: boolean;
@@ -13,14 +13,15 @@ interface Props {
 }
 
 export function FavoriteHeart({ active, onPress, size = 'md', variant = 'card', style }: Props) {
+  const { theme } = useTheme();
   const dim = size === 'sm' ? 32 : 40;
   const iconSize = size === 'sm' ? 16 : 20;
   const bg =
     variant === 'overlay'
-      ? 'rgba(255, 255, 255, 0.92)'
+      ? theme.colors.overlayCircle
       : active
-        ? colors.background
-        : colors.card;
+        ? theme.colors.background
+        : theme.colors.card;
 
   return (
     <Pressable
@@ -35,7 +36,7 @@ export function FavoriteHeart({ active, onPress, size = 'md', variant = 'card', 
           height: dim,
           borderRadius: dim / 2,
           backgroundColor: bg,
-          borderColor: colors.border,
+          borderColor: theme.colors.border,
         },
         style,
       ]}
@@ -46,8 +47,7 @@ export function FavoriteHeart({ active, onPress, size = 'md', variant = 'card', 
       <Feather
         name="heart"
         size={iconSize}
-        color={active ? colors.accentJournee : colors.text}
-        style={active ? styles.filled : undefined}
+        color={active ? theme.colors.favoriteHeart : theme.colors.text}
       />
     </Pressable>
   );
@@ -59,10 +59,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: radius.pill,
-  },
-  filled: {
-    // Feather doesn't provide a filled heart — the accent-coloured stroke is
-    // the visual signal that the item is favourite. Kept as a hook for a
-    // future custom SVG if we want a "filled" variant.
   },
 });
