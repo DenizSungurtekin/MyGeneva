@@ -195,6 +195,31 @@ Analyse juridique CH complète dans les échanges de session : robots.txt de lad
 - **Attribution en app mobile** : l'écran détail n'affiche pas encore "Source: La Décadanse ↗". À ajouter côté mobile.
 - **Autres sources** : la structure est prête, il ne reste qu'à écrire des scrapers additionnels (Ville de Genève opendata, Genève Tourisme, eventfrog).
 
+## Ajout — 2026-09-26 : DAG scrape_sources exécuté sur Airflow via docker-compose
+
+Premier vrai passage du scraper depuis Airflow, plus dans le CLI. Docker Compose ré-exercé de bout en bout.
+
+### Ce qui change
+- `docker-compose.yml` : ajout du mount `./:/opt/airflow/repo:ro` sur les 3 services Airflow (init/web/scheduler), plus `_PIP_ADDITIONAL_REQUIREMENTS: "beautifulsoup4 lxml httpx"` pour les scrapers. Deux env vars ajoutées côté web/scheduler : `MYGENEVA_DATABASE_URL=postgresql+psycopg2://mygeneva:mygeneva@postgres:5432/mygeneva` (pointe le runner vers Postgres) et `MYGENEVA_SCRAPE_DAYS=1` (fenêtre 1 jour pour ce smoke).
+- `pipeline/dags/scrape_sources.py` : `DEFAULT_DAYS` lit `MYGENEVA_SCRAPE_DAYS` env var (fallback 7).
+
+### Pièges rencontrés et corrections
+- **Piège 1** : `sqlalchemy` et `sqlmodel` dans `_PIP_ADDITIONAL_REQUIREMENTS` upgradent la SQLAlchemy 1.4 embarquée dans Airflow 2.10 → crash au parsing DAG (`MappedAnnotationError` sur TaskInstance.dag_model). Corrigé : retirer sqlalchemy/sqlmodel. Le runner utilise `sqlalchemy.text()` + `create_engine()`, ça marche avec la 1.4.
+- **Piège 2** : URL `postgresql+psycopg://…` (v3) non reconnue par SQLAlchemy 1.4 (`NoSuchModuleError: postgresql.psycopg`). Corrigé : `postgresql+psycopg2://` (l'image Airflow a psycopg2-binary).
+- **Piège 3** : `docker compose restart` ne relit pas les env du compose file. Il faut `up -d --force-recreate` pour prendre les nouvelles env vars.
+
+### Validation live
+DAG run `smoke3_2026_09_26` :
+- Statut : **success**
+- Task `scrape_ladecadanse` : parsed=20, inserted=20, updated=0, empty_days=0
+- Postgres `events` : 20 lignes, source='ladecadanse', tranche horaire 15:00 – 22:00 UTC (17:00 – 00:00 CEST, cohérent pour un vendredi soir)
+- Postgres `sources` (ligne `ladecadanse`) : status='ok', enabled=true, records_last_run=20, last_success_at horodaté correctement
+- Postgres `scrape_runs` : 1 ligne avec parsed_count=20, inserted_count=20, updated_count=0, status='success'
+- UTF-8 propre : "Les Pâquis sont à la rue", "FERMETURE DE SAISON : LA GRANDE PIRATERIE AVEC O.U.M.P.H." — les accents et caractères spéciaux passent
+
+### Statut de la stack
+Docker Compose reste **allumé** (Postgres + Airflow web + scheduler + init exited). `docker compose down` pour tout couper. Volume `mygeneva_postgres_data` persistant.
+
 ## Journal chronologique
 
 - **Init** : lecture des 4 fichiers de contexte, création `.gitignore`, `PROGRESS.md`, structure de repo, commit initial.

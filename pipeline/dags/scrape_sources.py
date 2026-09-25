@@ -10,6 +10,7 @@ resolve. Add via `_PIP_ADDITIONAL_REQUIREMENTS` in docker-compose.
 """
 from __future__ import annotations
 
+import os
 import sys
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
@@ -23,7 +24,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 
-DEFAULT_DAYS = 7
+DEFAULT_DAYS = int(os.environ.get("MYGENEVA_SCRAPE_DAYS", "7"))
 
 
 def _scrape(source_name: str, **_) -> dict:

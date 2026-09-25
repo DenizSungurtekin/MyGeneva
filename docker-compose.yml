@@ -50,11 +50,13 @@ services:
       _AIRFLOW_WWW_USER_PASSWORD: admin
       # Connection string Airflow tasks use to write to the app DB.
       AIRFLOW_CONN_MYGENEVA_DB: postgresql+psycopg2://mygeneva:mygeneva@postgres:5432/mygeneva
+      _PIP_ADDITIONAL_REQUIREMENTS: "beautifulsoup4 lxml httpx"
     volumes:
       - ./pipeline/dags:/opt/airflow/dags
       - ./pipeline/logs:/opt/airflow/logs
       - ./pipeline/plugins:/opt/airflow/plugins
       - ./pipeline/scripts:/opt/airflow/scripts
+      - ./:/opt/airflow/repo:ro
     entrypoint: /bin/bash
     command:
       - -c
@@ -80,6 +82,9 @@ services:
       AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "true"
       AIRFLOW_UID: "50000"
       AIRFLOW_CONN_MYGENEVA_DB: postgresql+psycopg2://mygeneva:mygeneva@postgres:5432/mygeneva
+      MYGENEVA_DATABASE_URL: postgresql+psycopg2://mygeneva:mygeneva@postgres:5432/mygeneva
+      MYGENEVA_SCRAPE_DAYS: "1"
+      _PIP_ADDITIONAL_REQUIREMENTS: "beautifulsoup4 lxml httpx"
     ports:
       - "8080:8080"
     volumes:
@@ -87,6 +92,7 @@ services:
       - ./pipeline/logs:/opt/airflow/logs
       - ./pipeline/plugins:/opt/airflow/plugins
       - ./pipeline/scripts:/opt/airflow/scripts
+      - ./:/opt/airflow/repo:ro
     command: webserver
 
   airflow-scheduler:
@@ -102,11 +108,15 @@ services:
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://mygeneva:mygeneva@postgres:5432/airflow
       AIRFLOW_UID: "50000"
       AIRFLOW_CONN_MYGENEVA_DB: postgresql+psycopg2://mygeneva:mygeneva@postgres:5432/mygeneva
+      MYGENEVA_DATABASE_URL: postgresql+psycopg2://mygeneva:mygeneva@postgres:5432/mygeneva
+      MYGENEVA_SCRAPE_DAYS: "1"
+      _PIP_ADDITIONAL_REQUIREMENTS: "beautifulsoup4 lxml httpx"
     volumes:
       - ./pipeline/dags:/opt/airflow/dags
       - ./pipeline/logs:/opt/airflow/logs
       - ./pipeline/plugins:/opt/airflow/plugins
       - ./pipeline/scripts:/opt/airflow/scripts
+      - ./:/opt/airflow/repo:ro
     command: scheduler
 
 volumes:
