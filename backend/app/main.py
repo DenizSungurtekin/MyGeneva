@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -16,20 +17,36 @@ from app.config import settings
 from app.routers import events, favorites, places, restaurants
 
 
+APP_VERSION = "0.1.0"
+
+
 def create_app() -> FastAPI:
     app = FastAPI(
         title="MyGeneva API",
         description="Backend API for MyGeneva — aggregation of events and restaurants in Geneva.",
-        version="0.1.0",
+        version=APP_VERSION,
     )
 
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=settings.cors_origins or ["*"],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+    # No cookie-based auth today → allow_credentials must be False when we
+    # use a wildcard. Configured origins keep credentials=True in case we
+    # add sessions later; wildcard falls back to no-credentials.
+    configured_origins = list(settings.cors_origins or [])
+    if configured_origins:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=configured_origins,
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
+    else:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=["*"],
+            allow_credentials=False,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
 
     app.include_router(events.router)
     app.include_router(places.router)
@@ -39,6 +56,16 @@ def create_app() -> FastAPI:
     @app.get("/health", tags=["meta"])
     def health() -> dict:
         return {"status": "ok"}
+
+    @app.get("/version", tags=["meta"])
+    def version() -> dict:
+        """Report the running app version + the commit SHA if the deployer
+        exposed it via env (Railway exposes RAILWAY_GIT_COMMIT_SHA)."""
+        return {
+            "version": APP_VERSION,
+            "commit": os.environ.get("RAILWAY_GIT_COMMIT_SHA", "unknown"),
+            "environment": os.environ.get("RAILWAY_ENVIRONMENT", "local"),
+        }
 
     return app
 
