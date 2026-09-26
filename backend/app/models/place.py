@@ -26,5 +26,10 @@ class Place(SQLModel, table=True):
     source: Optional[str] = Field(default=None, index=True)
     external_id: Optional[str] = Field(default=None, index=True)
 
+    # Stable place id from Google Places API — populated by the enricher.
+    # Once set, we can re-fetch fresh details (name, photos, editorial summary)
+    # any time. Null means the place hasn't been enriched yet.
+    google_place_id: Optional[str] = Field(default=None, index=True)
+
     created_at: datetime = Field(default_factory=_utcnow, nullable=False)
     updated_at: datetime = Field(default_factory=_utcnow, nullable=False)

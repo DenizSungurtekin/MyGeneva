@@ -182,11 +182,11 @@ def _upsert_event(engine: Engine, source: Source, raw: EventRaw) -> str:
                     "INSERT INTO events (title, description, category, "
                     "location_name, address, date_start, date_end, image_url, "
                     "source, source_url, external_id, place_id, is_verified, "
-                    "created_at, updated_at) "
+                    "is_promoted, created_at, updated_at) "
                     "VALUES (:title, :description, :category, :location_name, "
                     ":address, :date_start, :date_end, :image_url, :source, "
                     ":source_url, :external_id, :place_id, :is_verified, "
-                    ":created_at, :updated_at)"
+                    "FALSE, :created_at, :updated_at)"
                 ),
                 {**kwargs, "created_at": now, "updated_at": now},
             )

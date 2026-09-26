@@ -40,5 +40,6 @@ class PlaceRead(BaseModel):
     description: str
     source: Optional[str] = None
     external_id: Optional[str] = None
+    google_place_id: Optional[str] = None
     created_at: datetime
     updated_at: datetime
