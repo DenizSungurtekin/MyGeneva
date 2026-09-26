@@ -1,10 +1,10 @@
-import { Feather } from '@expo/vector-icons';
 import React, { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { radius, spacing, useTheme } from '../theme';
 import { EventItem } from '../types/api';
 import { timeRange } from '../utils/date';
+import { EventImage } from './EventImage';
 import { FavoriteHeart } from './FavoriteHeart';
 
 interface Props {
@@ -16,11 +16,6 @@ interface Props {
 
 export function EventCard({ event, favorite, onPress, onToggleFavorite }: Props) {
   const { theme } = useTheme();
-  const accent =
-    event.category === 'journee'
-      ? theme.categoryAccent.journee
-      : theme.categoryAccent.soiree;
-  const iconName = event.category === 'journee' ? 'sun' : 'moon';
 
   const styles = useMemo(
     () =>
@@ -37,13 +32,10 @@ export function EventCard({ event, favorite, onPress, onToggleFavorite }: Props)
           borderWidth: 1,
           borderRadius: radius.card,
         },
-        icon: {
-          width: 44,
-          height: 44,
-          borderRadius: radius.pill,
-          borderWidth: 1,
-          alignItems: 'center',
-          justifyContent: 'center',
+        thumb: {
+          width: 64,
+          height: 64,
+          borderRadius: 12,
         },
         body: {
           flex: 1,
@@ -62,9 +54,12 @@ export function EventCard({ event, favorite, onPress, onToggleFavorite }: Props)
 
   return (
     <Pressable style={styles.card} onPress={onPress} accessibilityRole="button">
-      <View style={[styles.icon, { borderColor: accent }]}>
-        <Feather name={iconName} size={18} color={accent} />
-      </View>
+      <EventImage
+        imageUrl={event.image_url}
+        variant="event"
+        style={styles.thumb}
+        iconSize={22}
+      />
       <View style={styles.body}>
         <Text style={styles.title} numberOfLines={2}>
           {event.title}
@@ -73,11 +68,7 @@ export function EventCard({ event, favorite, onPress, onToggleFavorite }: Props)
           {timeRange(event.date_start, event.date_end)} · {event.location_name}
         </Text>
       </View>
-      <FavoriteHeart
-        active={favorite}
-        onPress={onToggleFavorite}
-        size="sm"
-      />
+      <FavoriteHeart active={favorite} onPress={onToggleFavorite} size="sm" />
     </Pressable>
   );
 }

@@ -9,8 +9,8 @@ import {
   View,
 } from 'react-native';
 
+import { EventImage } from '../components/EventImage';
 import { FavoriteHeart } from '../components/FavoriteHeart';
-import { Placeholder } from '../components/Placeholder';
 import { Tag } from '../components/Tag';
 import { eventsApi } from '../api/events';
 import { restaurantsApi } from '../api/restaurants';
@@ -61,6 +61,9 @@ export function DetailScreen() {
         },
         header: {
           position: 'relative',
+        },
+        hero: {
+          height: 240,
         },
         backButton: {
           position: 'absolute',
@@ -163,10 +166,11 @@ export function DetailScreen() {
     <View style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 140 }}>
         <View style={styles.header}>
-          <Placeholder
+          <EventImage
+            imageUrl={detail.type === 'event' ? event?.image_url ?? null : restaurant?.image_url ?? null}
             variant={detail.type === 'event' ? 'event' : 'restaurant'}
-            height={240}
-            rounded={false}
+            style={styles.hero}
+            iconSize={32}
           />
           <Pressable
             style={styles.backButton}
