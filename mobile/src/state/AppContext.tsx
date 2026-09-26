@@ -47,6 +47,13 @@ interface AppState {
   favoriteEvents: EventItem[];
   favoriteRestaurants: RestaurantItem[];
 
+  // ListScreen search state — kept at app level so navigating to Detail and
+  // back preserves the user's active query + results.
+  listSearchQuery: string;
+  listSearchResults: EventItem[];
+  listSearchLoading: boolean;
+  setListSearchQuery: (q: string) => void;
+
   error: string | null;
 
   setScreen: (s: ScreenName) => void;
@@ -59,6 +66,8 @@ interface AppState {
   isFavorite: (type: FavoriteItemType, itemId: number) => boolean;
   refreshAll: () => Promise<void>;
 }
+
+const LIST_SEARCH_MIN_CHARS = 3;
 
 const AppContext = createContext<AppState | undefined>(undefined);
 
@@ -96,6 +105,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [favoritesLoading, setFavoritesLoading] = useState(false);
   const [favoriteEvents, setFavoriteEvents] = useState<EventItem[]>([]);
   const [favoriteRestaurants, setFavoriteRestaurants] = useState<RestaurantItem[]>([]);
+
+  const [listSearchQuery, setListSearchQuery] = useState<string>('');
+  const [listSearchResults, setListSearchResults] = useState<EventItem[]>([]);
+  const [listSearchLoading, setListSearchLoading] = useState(false);
 
   const [error, setError] = useState<string | null>(null);
 
@@ -198,6 +211,38 @@ export function AppProvider({ children }: { children: ReactNode }) {
     refreshEventHighlights();
   }, [refreshEventHighlights]);
 
+  // ListScreen search: refetch when query or category changes. Query is
+  // trimmed and normalized before comparing to the min-chars threshold so
+  // "  ab " doesn't count as 4 chars.
+  useEffect(() => {
+    const trimmed = listSearchQuery.trim();
+    if (trimmed.length < LIST_SEARCH_MIN_CHARS) {
+      setListSearchResults([]);
+      setListSearchLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setListSearchLoading(true);
+    const eventCategory = categoryToEventCategory(category);
+    eventsApi
+      .list({
+        search: trimmed,
+        ...(eventCategory ? { category: eventCategory } : {}),
+      })
+      .then((res) => {
+        if (!cancelled) setListSearchResults(res);
+      })
+      .catch(() => {
+        if (!cancelled) setListSearchResults([]);
+      })
+      .finally(() => {
+        if (!cancelled) setListSearchLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [listSearchQuery, category]);
+
   useEffect(() => {
     refreshRestaurants();
     refreshFavorites();
@@ -263,6 +308,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       favoritesLoading,
       favoriteEvents,
       favoriteRestaurants,
+      listSearchQuery,
+      listSearchResults,
+      listSearchLoading,
+      setListSearchQuery,
       error,
       setScreen,
       setCategory,
@@ -288,6 +337,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       favoritesLoading,
       favoriteEvents,
       favoriteRestaurants,
+      listSearchQuery,
+      listSearchResults,
+      listSearchLoading,
       error,
       openDetail,
       closeDetail,

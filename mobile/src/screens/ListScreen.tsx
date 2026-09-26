@@ -1,5 +1,5 @@
 import { Feather } from '@expo/vector-icons';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -13,8 +13,7 @@ import {
 import { CategoryTabs } from '../components/CategoryTabs';
 import { EventCard } from '../components/EventCard';
 import { RestaurantCard } from '../components/RestaurantCard';
-import { eventsApi } from '../api/events';
-import { categoryToEventCategory, useApp } from '../state/AppContext';
+import { useApp } from '../state/AppContext';
 import { categoryLabel, radius, spacing, useTheme } from '../theme';
 import { EventItem, RestaurantItem } from '../types/api';
 import { longDayLabel } from '../utils/date';
@@ -38,45 +37,19 @@ export function ListScreen() {
     toggleFavorite,
     openDetail,
     setScreen,
+    listSearchQuery,
+    setListSearchQuery,
+    listSearchResults,
+    listSearchLoading,
   } = useApp();
   const { theme } = useTheme();
 
-  const [search, setSearch] = useState('');
-  const [searchResults, setSearchResults] = useState<EventItem[] | null>(null);
-  const [searchLoading, setSearchLoading] = useState(false);
-  const trimmed = search.trim();
+  const trimmed = listSearchQuery.trim();
   const searchActive = trimmed.length >= SEARCH_MIN_CHARS;
-
-  useEffect(() => {
-    if (!searchActive) {
-      setSearchResults(null);
-      return;
-    }
-    let cancelled = false;
-    setSearchLoading(true);
-    const eventCategory = categoryToEventCategory(category);
-    eventsApi
-      .list({
-        search: trimmed,
-        ...(eventCategory ? { category: eventCategory } : {}),
-      })
-      .then((res) => {
-        if (!cancelled) setSearchResults(res);
-      })
-      .catch(() => {
-        if (!cancelled) setSearchResults([]);
-      })
-      .finally(() => {
-        if (!cancelled) setSearchLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [trimmed, searchActive, category]);
 
   const data: ListItem[] = useMemo(() => {
     if (searchActive) {
-      return (searchResults ?? []).map((e) => ({ kind: 'event', item: e }) as ListItem);
+      return listSearchResults.map((e) => ({ kind: 'event', item: e }) as ListItem);
     }
     if (category === 'restaurant') {
       return restaurants.map((r) => ({ kind: 'restaurant', item: r }) as ListItem);
@@ -84,10 +57,10 @@ export function ListScreen() {
     return events
       .filter((e) => e.category === category)
       .map((e) => ({ kind: 'event', item: e }) as ListItem);
-  }, [searchActive, searchResults, category, events, restaurants]);
+  }, [searchActive, listSearchResults, category, events, restaurants]);
 
   const isLoading = searchActive
-    ? searchLoading
+    ? listSearchLoading
     : category === 'restaurant'
       ? restaurantsLoading
       : eventsLoading;
@@ -180,17 +153,17 @@ export function ListScreen() {
           <Feather name="search" size={16} color={theme.colors.textMuted} />
           <TextInput
             style={styles.searchText}
-            value={search}
-            onChangeText={setSearch}
+            value={listSearchQuery}
+            onChangeText={setListSearchQuery}
             placeholder="Rechercher"
             placeholderTextColor={theme.colors.textMuted}
             returnKeyType="search"
             autoCorrect={false}
             autoCapitalize="none"
           />
-          {search.length > 0 ? (
+          {listSearchQuery.length > 0 ? (
             <Pressable
-              onPress={() => setSearch('')}
+              onPress={() => setListSearchQuery('')}
               accessibilityRole="button"
               accessibilityLabel="Effacer la recherche"
               hitSlop={8}
