@@ -173,7 +173,8 @@ def fetch_place_details(
             headers={
                 "X-Goog-Api-Key": key,
                 "X-Goog-FieldMask": (
-                    "displayName,formattedAddress,location,editorialSummary,photos"
+                    "displayName,formattedAddress,location,editorialSummary,"
+                    "primaryTypeDisplayName,photos"
                 ),
                 "Accept-Language": LANGUAGE,
             },
@@ -209,6 +210,16 @@ def fetch_place_details(
             translated = _translate_to_french(description_text, description_lang)
             if translated:
                 description_text = translated
+        # Fallback: Google only writes editorialSummary for a subset of notable
+        # places. For everything else we use primaryTypeDisplayName, which is
+        # a localised category label ("Boîte de nuit", "Café", "Salle de
+        # concert"). Not a description per se but signals the venue type,
+        # which is better than nothing.
+        if not description_text:
+            primary_type = p.get("primaryTypeDisplayName") or {}
+            display_type = primary_type.get("text")
+            if display_type:
+                description_text = display_type
         return PlaceEnrichment(
             google_place_id=google_place_id,
             name=display.get("text"),

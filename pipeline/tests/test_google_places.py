@@ -208,6 +208,49 @@ def test_translation_failure_falls_back_to_original(monkeypatch):
     assert e.description == "Original english text."
 
 
+def test_falls_back_to_primary_type_when_no_editorial(monkeypatch):
+    """When editorialSummary is absent, description falls back to primaryTypeDisplayName."""
+    monkeypatch.setattr(google_places, "_translate_to_french", lambda t, l: None)
+    payload = {
+        "displayName": {"text": "Un bar", "languageCode": "fr"},
+        "primaryTypeDisplayName": {"text": "Bar à cocktails", "languageCode": "fr"},
+    }
+    client = _client_returning(
+        {
+            "GET /v1/places/x": httpx.Response(
+                200,
+                content=json.dumps(payload),
+                headers={"Content-Type": "application/json"},
+            ),
+        }
+    )
+    e = google_places.fetch_place_details("x", client=client)
+    assert e is not None
+    assert e.description == "Bar à cocktails"
+
+
+def test_editorial_summary_wins_over_primary_type(monkeypatch):
+    """The rich editorialSummary is preferred when both are available."""
+    monkeypatch.setattr(google_places, "_translate_to_french", lambda t, l: None)
+    payload = {
+        "displayName": {"text": "X", "languageCode": "fr"},
+        "editorialSummary": {"text": "Une longue description.", "languageCode": "fr"},
+        "primaryTypeDisplayName": {"text": "Bar", "languageCode": "fr"},
+    }
+    client = _client_returning(
+        {
+            "GET /v1/places/x": httpx.Response(
+                200,
+                content=json.dumps(payload),
+                headers={"Content-Type": "application/json"},
+            ),
+        }
+    )
+    e = google_places.fetch_place_details("x", client=client)
+    assert e is not None
+    assert e.description == "Une longue description."
+
+
 def test_missing_api_key_raises():
     """Config error surfaces immediately, before any HTTP call."""
     import os
