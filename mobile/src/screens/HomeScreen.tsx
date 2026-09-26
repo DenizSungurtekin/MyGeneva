@@ -136,7 +136,7 @@ export function HomeScreen() {
         <ActivityIndicator style={styles.loader} color={theme.colors.text} />
       ) : preview.length === 0 ? (
         <Text style={styles.emptyText}>
-          Rien à afficher pour cette catégorie. Ajoute des données via le seed backend.
+          Rien de prévu pour ce moment-là. Change de jour ou reviens plus tard.
         </Text>
       ) : (
         preview.map((item) => {

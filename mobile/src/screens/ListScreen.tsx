@@ -108,7 +108,9 @@ export function ListScreen() {
           keyExtractor={(entry) => `${entry.kind}-${entry.item.id}`}
           contentContainerStyle={{ paddingBottom: spacing.xxl }}
           ListEmptyComponent={
-            <Text style={styles.empty}>Rien à afficher pour l'instant.</Text>
+            <Text style={styles.empty}>
+              Rien de prévu pour ce moment-là. Change de jour ou reviens plus tard.
+            </Text>
           }
           renderItem={({ item: entry }) => {
             if (entry.kind === 'event') {
