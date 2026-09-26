@@ -293,6 +293,59 @@ def test_highlights_empty_day_returns_empty(client):
     assert resp.json() == []
 
 
+def test_search_matches_title_case_insensitive(client):
+    client.post("/events", json=_event_payload(title="Sven Väth au Motel Campo"))
+    client.post("/events", json=_event_payload(title="Marché du Molard"))
+    resp = client.get("/events", params={"search": "sven"})
+    titles = [e["title"] for e in resp.json()]
+    assert titles == ["Sven Väth au Motel Campo"]
+
+
+def test_search_matches_description(client):
+    client.post(
+        "/events",
+        json=_event_payload(title="Anonymous", description="Concert techno berlin scene"),
+    )
+    client.post("/events", json=_event_payload(title="Anonymous 2", description="Yoga en plein air"))
+    resp = client.get("/events", params={"search": "techno"})
+    titles = [e["title"] for e in resp.json()]
+    assert titles == ["Anonymous"]
+
+
+def test_search_ignored_below_min_chars(client):
+    client.post("/events", json=_event_payload(title="Only match"))
+    # 2-char query is below the threshold — falls back to the default listing.
+    resp = client.get("/events", params={"search": "ma"})
+    assert len(resp.json()) == 1     # everything returned, filter not applied
+
+
+def test_search_ignores_day_filter(client):
+    """Search is global — a matching event on another day still shows up."""
+    day1 = "2026-05-01"
+    day2 = "2026-05-02"
+    client.post(
+        "/events",
+        json=_event_payload(title="Sven at Motel", date_start=f"{day1}T21:00:00+00:00", date_end=None),
+    )
+    resp = client.get("/events", params={"date": day2, "search": "sven"})
+    titles = [e["title"] for e in resp.json()]
+    assert titles == ["Sven at Motel"]
+
+
+def test_search_combined_with_category(client):
+    client.post(
+        "/events",
+        json=_event_payload(title="Techno gig", category="soiree", date_end=None),
+    )
+    client.post(
+        "/events",
+        json=_event_payload(title="Techno lunch talk", category="journee", date_end=None),
+    )
+    resp = client.get("/events", params={"search": "techno", "category": "soiree"})
+    titles = [e["title"] for e in resp.json()]
+    assert titles == ["Techno gig"]
+
+
 def test_events_sorted_by_start(client):
     later = datetime(2026, 3, 5, 20, 0, tzinfo=timezone.utc)
     earlier = datetime(2026, 3, 5, 10, 0, tzinfo=timezone.utc)

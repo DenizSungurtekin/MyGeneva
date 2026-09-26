@@ -65,7 +65,9 @@ export function EventCard({ event, favorite, onPress, onToggleFavorite }: Props)
           {event.title}
         </Text>
         <Text style={styles.meta} numberOfLines={1}>
-          {timeRange(event.date_start, event.date_end)} · {event.location_name}
+          {[event.location_name || event.address, timeRange(event.date_start, event.date_end)]
+            .filter(Boolean)
+            .join(' · ')}
         </Text>
       </View>
       <FavoriteHeart active={favorite} onPress={onToggleFavorite} size="sm" />

@@ -75,14 +75,28 @@ def _apply_day_filter(query, day: date, category: Optional[EventCategory]):
     return query.where(journee_day | soiree_day)
 
 
+SEARCH_MIN_CHARS = 3
+
+
 @router.get("", response_model=List[EventRead])
 def list_events(
     category: Optional[EventCategory] = Query(default=None),
     day: Optional[date] = Query(default=None, alias="date"),
+    search: Optional[str] = Query(default=None, min_length=0, max_length=200),
     session: Session = Depends(get_session),
 ) -> List[Event]:
     query = select(Event)
-    if day is not None:
+    search_active = search is not None and len(search.strip()) >= SEARCH_MIN_CHARS
+    if search_active:
+        pattern = f"%{search.strip()}%"
+        query = query.where(
+            Event.title.ilike(pattern) | Event.description.ilike(pattern)
+        )
+        if category is not None:
+            query = query.where(Event.category == category)
+        # Search is global — deliberately ignores the day filter so users can
+        # find an event across the whole scraped window with one keyword.
+    elif day is not None:
         query = _apply_day_filter(query, day, category)
     elif category is not None:
         query = query.where(Event.category == category)

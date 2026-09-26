@@ -220,6 +220,21 @@ Réutiliser `_apply_day_filter` (le même que `/events`) pour la fenêtre tempor
 
 ---
 
+## Recherche accent-insensitive
+
+**Statut** : planifié (2026-09-26). Petit fix UX.
+**Contexte** : `/events?search=xxx` fait un `ILIKE '%xxx%'` sur `title` + `description`. En Postgres, ILIKE ignore la casse mais **pas les accents**. Taper "paquis" sur mobile ne trouve pas "Pâquis". Puisque la majorité des utilisateurs sur clavier tactile n'écrivent pas les accents, c'est un vrai manque à gagner.
+
+**Options** :
+1. **Extension Postgres `unaccent`** — la plus propre. Une migration `CREATE EXTENSION IF NOT EXISTS unaccent`, puis la requête devient `unaccent(title) ILIKE unaccent('%xxx%')`. Fonctionne côté serveur. Souci : les tests unitaires utilisent SQLite qui n'a pas `unaccent()` — il faudra soit conditionner la requête au dialect, soit switcher les tests sur un Postgres jetable (docker par test suite, coûteux à setup).
+2. **Colonne dénormalisée `title_normalized`** — au moment du scrape, on stocke une version `unicodedata.normalize('NFKD') + strip accents + lower()` du titre et de la description dans deux colonnes séparées. La recherche fait ILIKE contre ces colonnes-là (side-normalized input). Marche partout (SQLite compris), mais duplique la donnée et demande un backfill.
+
+**Ma reco** : Option 2 pour rester dialect-agnostic. Coûte une migration + 15 lignes dans le scraper + backfill.
+
+**Effort** : ~1 h 30.
+
+---
+
 ## Autres pistes évoquées en session, à formaliser plus tard
 
 - **Purge `scrape_runs.raw_html`** : la colonne est prête mais non peuplée (le scraper n'y envoie rien pour l'instant). Si on l'active, prévoir un job Airflow qui garde les N dernières runs par source, sinon la table grossit d'~1 MB/jour.

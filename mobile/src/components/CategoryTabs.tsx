@@ -12,9 +12,15 @@ const ORDER: CategoryKey[] = ['soiree', 'journee'];
 interface Props {
   value: CategoryKey;
   onChange: (c: CategoryKey) => void;
+  /**
+   * Left/right padding around the pill row. Defaults to spacing.lg for
+   * standalone use; set to 0 when composing next to other elements in a
+   * row that already handles its own padding (see ListScreen search row).
+   */
+  paddingHorizontal?: number;
 }
 
-export function CategoryTabs({ value, onChange }: Props) {
+export function CategoryTabs({ value, onChange, paddingHorizontal = spacing.lg }: Props) {
   const { theme } = useTheme();
   const styles = useMemo(
     () =>
@@ -22,7 +28,7 @@ export function CategoryTabs({ value, onChange }: Props) {
         container: {
           flexDirection: 'row',
           gap: spacing.xs,
-          paddingHorizontal: spacing.lg,
+          paddingHorizontal,
         },
         tab: {
           paddingHorizontal: spacing.md,
@@ -44,7 +50,7 @@ export function CategoryTabs({ value, onChange }: Props) {
           color: theme.colors.background,
         },
       }),
-    [theme],
+    [theme, paddingHorizontal],
   );
 
   return (
