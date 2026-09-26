@@ -28,7 +28,12 @@ SOURCE_NAME = "ladecadanse"
 BASE_URL = "https://www.ladecadanse.ch"
 USER_AGENT = "MyGeneva/0.1 (aggregateur genevois; contact: mygeneva@gmail.com)"
 CRAWL_DELAY_S = 15
-GENRE_WHITELIST = {"fetes"}                # only <h2 id="fetes"> for MVP
+# Which <section class="genre"><h2 id="..."> we ingest. fetes populates the
+# soirée feed, expos + divers add richer content to the journée feed
+# (vernissages, marchés, spectacles, associatifs, etc.). concerts/cine/theatre
+# stay out for now — their listings often duplicate ticketing platforms and
+# introduce noise.
+GENRE_WHITELIST = {"fetes", "expos", "divers"}
 LOCAL_TZ = ZoneInfo("Europe/Zurich")
 
 _last_fetch_at: Optional[datetime] = None

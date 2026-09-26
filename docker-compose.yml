@@ -84,7 +84,7 @@ services:
       AIRFLOW_CONN_MYGENEVA_DB: postgresql+psycopg2://mygeneva:mygeneva@postgres:5432/mygeneva
       MYGENEVA_DATABASE_URL: postgresql+psycopg2://mygeneva:mygeneva@postgres:5432/mygeneva
       MYGENEVA_SCRAPE_DAYS: "7"
-      MYGENEVA_SCRAPE_LOOKBACK: "3"
+      MYGENEVA_SCRAPE_LOOKBACK: "2"
       _PIP_ADDITIONAL_REQUIREMENTS: "beautifulsoup4 lxml httpx"
     ports:
       - "8080:8080"
@@ -111,7 +111,7 @@ services:
       AIRFLOW_CONN_MYGENEVA_DB: postgresql+psycopg2://mygeneva:mygeneva@postgres:5432/mygeneva
       MYGENEVA_DATABASE_URL: postgresql+psycopg2://mygeneva:mygeneva@postgres:5432/mygeneva
       MYGENEVA_SCRAPE_DAYS: "7"
-      MYGENEVA_SCRAPE_LOOKBACK: "3"
+      MYGENEVA_SCRAPE_LOOKBACK: "2"
       _PIP_ADDITIONAL_REQUIREMENTS: "beautifulsoup4 lxml httpx"
     volumes:
       - ./pipeline/dags:/opt/airflow/dags
