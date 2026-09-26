@@ -7,15 +7,27 @@ import { spacing, useTheme } from '../theme';
 import { ScreenName, useApp } from '../state/AppContext';
 
 const TABS: { key: ScreenName; label: string; icon: keyof typeof Feather.glyphMap }[] = [
+  { key: 'lieu', label: 'Lieux', icon: 'map-pin' },
   { key: 'accueil', label: 'Accueil', icon: 'home' },
   { key: 'favoris', label: 'Favoris', icon: 'heart' },
 ];
+
+// Screens that aren't tabs themselves — map each to the tab that owns them
+// so the correct nav item stays highlighted while the user drills in.
+const SCREEN_TO_TAB: Record<ScreenName, ScreenName> = {
+  accueil: 'accueil',
+  lieu: 'lieu',
+  lieuDetail: 'lieu',
+  lieuEvents: 'lieu',
+  detail: 'accueil',
+  favoris: 'favoris',
+};
 
 export function NavBar() {
   const { screen, setScreen } = useApp();
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
-  const active: ScreenName = screen === 'detail' ? 'accueil' : screen;
+  const active: ScreenName = SCREEN_TO_TAB[screen];
 
   const styles = useMemo(
     () =>

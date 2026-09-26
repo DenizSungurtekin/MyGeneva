@@ -16,6 +16,7 @@ import { FavoriteHeart } from '../components/FavoriteHeart';
 import { Tag } from '../components/Tag';
 import { eventsApi } from '../api/events';
 import { restaurantsApi } from '../api/restaurants';
+import { CategoryKey } from '../theme/colors';
 import { useApp } from '../state/AppContext';
 import { categoryLabel, radius, spacing, useTheme } from '../theme';
 import { EventItem, RestaurantItem } from '../types/api';
@@ -23,7 +24,18 @@ import { longDayLabel, timeRange } from '../utils/date';
 import { formatRating } from '../utils/format';
 
 export function DetailScreen() {
-  const { detail, closeDetail, isFavorite, toggleFavorite } = useApp();
+  const {
+    detail,
+    closeDetail,
+    isFavorite,
+    toggleFavorite,
+    openPlace,
+    setSelectedDay,
+    setCategory,
+    setSearchQuery,
+    setScreen,
+    places,
+  } = useApp();
   const { theme } = useTheme();
   const [event, setEvent] = useState<EventItem | null>(null);
   const [restaurant, setRestaurant] = useState<RestaurantItem | null>(null);
@@ -196,10 +208,22 @@ export function DetailScreen() {
           <Text style={styles.error}>{error}</Text>
         ) : detail.type === 'event' && event ? (
           <View style={styles.body}>
-            <Tag
-              label={categoryLabel[event.category === 'journee' ? 'journee' : 'soiree']}
-              color={accent}
-            />
+            <Pressable
+              onPress={() => {
+                setSelectedDay(new Date(event.date_start));
+                setCategory(event.category as CategoryKey);
+                setSearchQuery('');
+                setScreen('accueil');
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={`Voir tous les événements ${categoryLabel[event.category]}`}
+              style={{ alignSelf: 'flex-start' }}
+            >
+              <Tag
+                label={categoryLabel[event.category === 'journee' ? 'journee' : 'soiree']}
+                color={accent}
+              />
+            </Pressable>
             <Text style={styles.title}>{event.title}</Text>
             <View style={styles.metaRow}>
               <Feather name="clock" size={14} color={theme.colors.textMuted} />
@@ -207,10 +231,44 @@ export function DetailScreen() {
                 {longDayLabel(new Date(event.date_start))} · {timeRange(event.date_start, event.date_end)}
               </Text>
             </View>
-            <View style={styles.metaRow}>
-              <Feather name="map-pin" size={14} color={theme.colors.textMuted} />
-              <Text style={styles.metaText}>{event.location_name || event.address || 'Genève'}</Text>
-            </View>
+            {(() => {
+              const eventPlace = event.place_id != null
+                ? places.find((p) => p.id === event.place_id)
+                : undefined;
+              const placeLabel = eventPlace?.name || event.location_name || event.address || 'Genève';
+              const clickable = Boolean(eventPlace);
+              const contents = (
+                <View style={styles.metaRow}>
+                  <Feather
+                    name="map-pin"
+                    size={14}
+                    color={clickable ? theme.colors.accentJournee : theme.colors.textMuted}
+                  />
+                  <Text
+                    style={[
+                      styles.metaText,
+                      clickable && {
+                        color: theme.colors.accentJournee,
+                        textDecorationLine: 'underline',
+                      },
+                    ]}
+                  >
+                    {placeLabel}
+                  </Text>
+                </View>
+              );
+              return clickable && eventPlace ? (
+                <Pressable
+                  onPress={() => openPlace({ id: eventPlace.id, origin: 'detail' })}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Voir le lieu ${eventPlace.name}`}
+                >
+                  {contents}
+                </Pressable>
+              ) : (
+                contents
+              );
+            })()}
             <Text style={styles.description}>{event.description || 'Pas de description.'}</Text>
             <Section title="Adresse" body={event.address || 'Non renseignée'} />
             <EventMap

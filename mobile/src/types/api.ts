@@ -14,7 +14,22 @@ export interface EventItem {
   image_url: string | null;
   source: string | null;
   source_url: string | null;
+  place_id: number | null;
   is_verified: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PlaceItem {
+  id: number;
+  name: string;
+  address: string;
+  latitude: number | null;
+  longitude: number | null;
+  image_url: string | null;
+  description: string;
+  source: string | null;
+  external_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -38,7 +53,7 @@ export interface RestaurantItem {
   updated_at: string;
 }
 
-export type FavoriteItemType = 'event' | 'restaurant';
+export type FavoriteItemType = 'event' | 'restaurant' | 'place';
 
 export interface FavoriteItem {
   id: number;

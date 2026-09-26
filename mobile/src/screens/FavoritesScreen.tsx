@@ -1,42 +1,35 @@
 import { Feather } from '@expo/vector-icons';
 import React, { useMemo } from 'react';
-import { ActivityIndicator, FlatList, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { EventCard } from '../components/EventCard';
+import { PlaceCard } from '../components/PlaceCard';
 import { RestaurantCard } from '../components/RestaurantCard';
 import { useApp } from '../state/AppContext';
 import { spacing, useTheme } from '../theme';
-import { EventItem, RestaurantItem } from '../types/api';
-
-type Row =
-  | { kind: 'event'; item: EventItem }
-  | { kind: 'restaurant'; item: RestaurantItem };
 
 export function FavoritesScreen() {
   const {
     favoriteEvents,
     favoriteRestaurants,
+    favoritePlaces,
     favoritesLoading,
     isFavorite,
     toggleFavorite,
     openDetail,
+    openPlace,
   } = useApp();
   const { theme } = useTheme();
 
-  const rows: Row[] = useMemo(() => {
-    const combined: Row[] = [
-      ...favoriteEvents.map((e) => ({ kind: 'event', item: e }) as Row),
-      ...favoriteRestaurants.map((r) => ({ kind: 'restaurant', item: r }) as Row),
-    ];
-    return combined;
-  }, [favoriteEvents, favoriteRestaurants]);
+  const isEmpty =
+    favoriteEvents.length === 0 &&
+    favoriteRestaurants.length === 0 &&
+    favoritePlaces.length === 0;
 
   const styles = useMemo(
     () =>
       StyleSheet.create({
-        container: {
-          flex: 1,
-        },
+        container: { flex: 1 },
         header: {
           paddingHorizontal: spacing.lg,
           paddingTop: spacing.md,
@@ -45,6 +38,12 @@ export function FavoritesScreen() {
         title: {
           ...theme.text.h1,
           marginTop: spacing.xxs,
+        },
+        sectionHeader: {
+          ...theme.text.eyebrow,
+          paddingHorizontal: spacing.lg,
+          marginTop: spacing.md,
+          marginBottom: spacing.xs,
         },
         empty: {
           flex: 1,
@@ -75,41 +74,66 @@ export function FavoritesScreen() {
 
       {favoritesLoading ? (
         <ActivityIndicator style={{ marginTop: spacing.lg }} color={theme.colors.text} />
-      ) : rows.length === 0 ? (
+      ) : isEmpty ? (
         <View style={styles.empty}>
           <Feather name="heart" size={32} color={theme.colors.textMuted} />
           <Text style={styles.emptyTitle}>Aucun favori pour l'instant</Text>
           <Text style={styles.emptyBody}>
-            Appuie sur le cœur d'un événement ou d'un restaurant pour le retrouver ici.
+            Appuie sur le cœur d'un lieu ou d'un événement pour le retrouver ici.
           </Text>
         </View>
       ) : (
-        <FlatList
-          data={rows}
-          keyExtractor={(row) => `${row.kind}-${row.item.id}`}
+        <ScrollView
           contentContainerStyle={{ paddingBottom: spacing.xxl }}
-          renderItem={({ item: row }) =>
-            row.kind === 'event' ? (
-              <EventCard
-                event={row.item}
-                favorite={isFavorite('event', row.item.id)}
-                onPress={() =>
-                  openDetail({ type: 'event', id: row.item.id, origin: 'favoris' })
-                }
-                onToggleFavorite={() => toggleFavorite('event', row.item.id)}
-              />
-            ) : (
-              <RestaurantCard
-                restaurant={row.item}
-                favorite={isFavorite('restaurant', row.item.id)}
-                onPress={() =>
-                  openDetail({ type: 'restaurant', id: row.item.id, origin: 'favoris' })
-                }
-                onToggleFavorite={() => toggleFavorite('restaurant', row.item.id)}
-              />
-            )
-          }
-        />
+          showsVerticalScrollIndicator={false}
+        >
+          {favoritePlaces.length > 0 && (
+            <>
+              <Text style={styles.sectionHeader}>Lieux</Text>
+              {favoritePlaces.map((p) => (
+                <PlaceCard
+                  key={`place-${p.id}`}
+                  place={p}
+                  favorite
+                  onPress={() => openPlace({ id: p.id, origin: 'favoris' })}
+                  onToggleFavorite={() => toggleFavorite('place', p.id)}
+                />
+              ))}
+            </>
+          )}
+          {favoriteEvents.length > 0 && (
+            <>
+              <Text style={styles.sectionHeader}>Événements</Text>
+              {favoriteEvents.map((e) => (
+                <EventCard
+                  key={`event-${e.id}`}
+                  event={e}
+                  favorite={isFavorite('event', e.id)}
+                  onPress={() =>
+                    openDetail({ type: 'event', id: e.id, origin: 'favoris' })
+                  }
+                  onToggleFavorite={() => toggleFavorite('event', e.id)}
+                />
+              ))}
+            </>
+          )}
+          {favoriteRestaurants.length > 0 && (
+            <>
+              <Text style={styles.sectionHeader}>Restaurants</Text>
+              {favoriteRestaurants.map((r) => (
+                <RestaurantCard
+                  key={`rest-${r.id}`}
+                  restaurant={r}
+                  favorite={isFavorite('restaurant', r.id)}
+                  onPress={() =>
+                    openDetail({ type: 'restaurant', id: r.id, origin: 'favoris' })
+                  }
+                  onToggleFavorite={() => toggleFavorite('restaurant', r.id)}
+                />
+              ))}
+            </>
+          )}
+        </ScrollView>
       )}
     </View>
   );

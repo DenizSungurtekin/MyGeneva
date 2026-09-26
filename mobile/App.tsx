@@ -30,6 +30,9 @@ import { NavBar } from './src/components/NavBar';
 import { DetailScreen } from './src/screens/DetailScreen';
 import { FavoritesScreen } from './src/screens/FavoritesScreen';
 import { HomeScreen } from './src/screens/HomeScreen';
+import { LieuEventsScreen } from './src/screens/LieuEventsScreen';
+import { PlaceDetailScreen } from './src/screens/PlaceDetailScreen';
+import { PlacesListScreen } from './src/screens/PlacesListScreen';
 import { AppProvider, useApp } from './src/state/AppContext';
 import { spacing, ThemeProvider, useTheme } from './src/theme';
 
@@ -72,6 +75,9 @@ function ScreenRouter() {
       ) : null}
       <View style={{ flex: 1 }}>
         {screen === 'accueil' && <HomeScreen />}
+        {screen === 'lieu' && <PlacesListScreen />}
+        {screen === 'lieuDetail' && <PlaceDetailScreen />}
+        {screen === 'lieuEvents' && <LieuEventsScreen />}
         {screen === 'detail' && <DetailScreen />}
         {screen === 'favoris' && <FavoritesScreen />}
       </View>
