@@ -113,6 +113,7 @@ export function FavoritesScreen() {
                     openDetail({ type: 'event', id: e.id, origin: 'favoris' })
                   }
                   onToggleFavorite={() => toggleFavorite('event', e.id)}
+                  showDate
                 />
               ))}
             </>

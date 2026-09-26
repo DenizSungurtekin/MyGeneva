@@ -279,10 +279,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const closePlace = useCallback(() => {
     setPlaceDetail((current) => {
-      if (current) {
-        setScreen(current.origin);
-      } else {
+      if (!current) {
         setScreen('lieu');
+        return null;
+      }
+      setScreen(current.origin);
+      // If we're bouncing back to another lieu screen (LieuEvents → PlaceDetail),
+      // the target still needs the placeDetail context to render. Only clear it
+      // when we actually leave the lieu flow.
+      if (current.origin === 'lieuDetail' || current.origin === 'lieuEvents') {
+        return current;
       }
       return null;
     });

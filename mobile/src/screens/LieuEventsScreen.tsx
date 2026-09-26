@@ -105,6 +105,7 @@ export function LieuEventsScreen() {
                 openDetail({ type: 'event', id: item.id, origin: 'lieuEvents' })
               }
               onToggleFavorite={() => toggleFavorite('event', item.id)}
+              showDate
             />
           )}
         />

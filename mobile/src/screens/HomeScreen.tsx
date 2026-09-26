@@ -175,28 +175,29 @@ export function HomeScreen() {
     </View>
   );
 
-  if (isLoading) {
-    return (
-      <View style={styles.content}>
-        {header}
-        <ActivityIndicator style={styles.loader} color={theme.colors.text} />
-      </View>
-    );
-  }
-
+  // Single tree: FlatList is mounted whether we're loading, empty, or filled.
+  // Switching between View and FlatList on loading transitions was remounting
+  // the DayPicker + CategoryTabs + TextInput inside the header — dropping
+  // keyboard focus after each keystroke and flickering the day pills on
+  // category switch. Keeping the same tree preserves component identity.
   return (
     <FlatList
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
       ListHeaderComponent={header}
+      keyboardShouldPersistTaps="handled"
       data={data}
       keyExtractor={(item) => `${isRestaurant ? 'r' : 'e'}-${item.id}`}
       ListEmptyComponent={
-        <Text style={styles.emptyText}>
-          {searchActive
-            ? `Aucun événement ne contient "${trimmedSearch}" ce jour-là.`
-            : 'Rien de prévu pour ce moment-là. Change de jour ou reviens plus tard.'}
-        </Text>
+        isLoading ? (
+          <ActivityIndicator style={styles.loader} color={theme.colors.text} />
+        ) : (
+          <Text style={styles.emptyText}>
+            {searchActive
+              ? `Aucun événement ne contient "${trimmedSearch}" ce jour-là.`
+              : 'Rien de prévu pour ce moment-là. Change de jour ou reviens plus tard.'}
+          </Text>
+        )
       }
       renderItem={({ item }) => {
         if (isRestaurant) {
@@ -219,6 +220,7 @@ export function HomeScreen() {
             favorite={isFavorite('event', e.id)}
             onPress={() => openDetail({ type: 'event', id: e.id, origin: 'accueil' })}
             onToggleFavorite={() => toggleFavorite('event', e.id)}
+            showCategoryChip={false}
           />
         );
       }}

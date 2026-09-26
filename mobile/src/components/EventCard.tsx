@@ -14,9 +14,30 @@ interface Props {
   favorite: boolean;
   onPress: () => void;
   onToggleFavorite: () => void;
+  /** Show the [Journée]/[Soirée] chip. Off on screens where the user is
+   *  already filtering by category (Home). Kept on mixed-category screens
+   *  like Favorites or a place's event list. */
+  showCategoryChip?: boolean;
+  /** Prefix the meta line with the event's date (dd/mm). Useful when the
+   *  screen shows events from multiple days (Favorites, LieuEvents). */
+  showDate?: boolean;
 }
 
-export function EventCard({ event, favorite, onPress, onToggleFavorite }: Props) {
+function formatDayMonth(iso: string): string {
+  const d = new Date(iso);
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  return `${dd}/${mm}`;
+}
+
+export function EventCard({
+  event,
+  favorite,
+  onPress,
+  onToggleFavorite,
+  showCategoryChip = true,
+  showDate = false,
+}: Props) {
   const { theme } = useTheme();
   const { places, openPlace, setSelectedDay, setCategory, setSearchQuery, setScreen } = useApp();
 
@@ -101,19 +122,21 @@ export function EventCard({ event, favorite, onPress, onToggleFavorite }: Props)
           {event.title}
         </Text>
         <View style={styles.chipRow}>
-          <Pressable
-            onPress={(e) => {
-              e.stopPropagation?.();
-              onPressCategoryChip();
-            }}
-            style={[styles.chip, { borderColor: categoryColor }]}
-            accessibilityRole="button"
-            accessibilityLabel={`Voir ${categoryLabel[event.category]}`}
-          >
-            <Text style={[styles.chipLabel, { color: categoryColor }]}>
-              {categoryLabel[event.category]}
-            </Text>
-          </Pressable>
+          {showCategoryChip ? (
+            <Pressable
+              onPress={(e) => {
+                e.stopPropagation?.();
+                onPressCategoryChip();
+              }}
+              style={[styles.chip, { borderColor: categoryColor }]}
+              accessibilityRole="button"
+              accessibilityLabel={`Voir ${categoryLabel[event.category]}`}
+            >
+              <Text style={[styles.chipLabel, { color: categoryColor }]}>
+                {categoryLabel[event.category]}
+              </Text>
+            </Pressable>
+          ) : null}
           {place ? (
             <Pressable
               onPress={(e) => {
@@ -138,7 +161,12 @@ export function EventCard({ event, favorite, onPress, onToggleFavorite }: Props)
           ) : null}
         </View>
         <Text style={styles.meta} numberOfLines={1}>
-          {timeRange(event.date_start, event.date_end)}
+          {[
+            showDate ? formatDayMonth(event.date_start) : null,
+            timeRange(event.date_start, event.date_end),
+          ]
+            .filter(Boolean)
+            .join(' · ')}
         </Text>
       </View>
       <FavoriteHeart active={favorite} onPress={onToggleFavorite} size="sm" />
