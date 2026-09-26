@@ -77,7 +77,7 @@ function isEventInFuture(event: EventItem): boolean {
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [screen, setScreen] = useState<ScreenName>('accueil');
-  const [category, setCategory] = useState<CategoryKey>('journee');
+  const [category, setCategory] = useState<CategoryKey>('soiree');
   const [selectedDay, setSelectedDay] = useState<Date>(() => {
     const now = new Date();
     now.setHours(0, 0, 0, 0);

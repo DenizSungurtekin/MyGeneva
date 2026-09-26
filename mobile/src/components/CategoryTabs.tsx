@@ -7,7 +7,7 @@ import { categoryLabel, CategoryKey, radius, spacing, useTheme } from '../theme'
 // Backend endpoints, model, and detail path stay in place so the tab can be
 // re-enabled with a single line when we bring restaurants back (probably as
 // "restaurants near this event" contextual, not a standalone browse).
-const ORDER: CategoryKey[] = ['journee', 'soiree'];
+const ORDER: CategoryKey[] = ['soiree', 'journee'];
 
 interface Props {
   value: CategoryKey;
