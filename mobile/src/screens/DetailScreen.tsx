@@ -255,9 +255,7 @@ export function DetailScreen() {
           accessibilityRole="button"
         >
           <Feather name="heart" size={16} color={theme.colors.ctaText} />
-          <Text style={theme.text.button}>
-            {favorite ? 'Ajouté aux favoris' : 'Ajouter aux favoris'}
-          </Text>
+          <Text style={theme.text.button}>Favoris</Text>
         </Pressable>
       </View>
     </View>
