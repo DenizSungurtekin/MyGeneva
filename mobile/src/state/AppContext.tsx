@@ -37,6 +37,8 @@ interface AppState {
 
   events: EventItem[];
   eventsLoading: boolean;
+  eventHighlights: EventItem[];
+  eventHighlightsLoading: boolean;
   restaurants: RestaurantItem[];
   restaurantsLoading: boolean;
 
@@ -78,6 +80,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const [events, setEvents] = useState<EventItem[]>([]);
   const [eventsLoading, setEventsLoading] = useState(false);
+  const [eventHighlights, setEventHighlights] = useState<EventItem[]>([]);
+  const [eventHighlightsLoading, setEventHighlightsLoading] = useState(false);
   const [restaurants, setRestaurants] = useState<RestaurantItem[]>([]);
   const [restaurantsLoading, setRestaurantsLoading] = useState(false);
 
@@ -101,6 +105,31 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setEventsLoading(false);
     }
   }, [selectedDay]);
+
+  const refreshEventHighlights = useCallback(async () => {
+    const eventCategory = categoryToEventCategory(category);
+    if (!eventCategory) {
+      // Restaurant tab doesn't use highlights — clear stale state so consumers
+      // fall back to their own preview logic.
+      setEventHighlights([]);
+      return;
+    }
+    setEventHighlightsLoading(true);
+    try {
+      const iso = toISODate(selectedDay);
+      const data = await eventsApi.highlights({
+        date: iso,
+        category: eventCategory,
+        limit: 3,
+      });
+      setEventHighlights(data);
+      setError(null);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setEventHighlightsLoading(false);
+    }
+  }, [selectedDay, category]);
 
   const refreshRestaurants = useCallback(async () => {
     setRestaurantsLoading(true);
@@ -145,12 +174,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const refreshAll = useCallback(async () => {
-    await Promise.all([refreshEvents(), refreshRestaurants(), refreshFavorites()]);
-  }, [refreshEvents, refreshRestaurants, refreshFavorites]);
+    await Promise.all([
+      refreshEvents(),
+      refreshEventHighlights(),
+      refreshRestaurants(),
+      refreshFavorites(),
+    ]);
+  }, [refreshEvents, refreshEventHighlights, refreshRestaurants, refreshFavorites]);
 
   useEffect(() => {
     refreshEvents();
   }, [refreshEvents]);
+
+  useEffect(() => {
+    refreshEventHighlights();
+  }, [refreshEventHighlights]);
 
   useEffect(() => {
     refreshRestaurants();
@@ -177,12 +215,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
         } else {
           await favoritesApi.add(type, itemId);
         }
-        await refreshFavorites();
+        await Promise.all([refreshFavorites(), refreshEventHighlights()]);
       } catch (e) {
         setError((e as Error).message);
       }
     },
-    [favorites, refreshFavorites],
+    [favorites, refreshFavorites, refreshEventHighlights],
   );
 
   const openDetail = useCallback((target: DetailTarget) => {
@@ -209,6 +247,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       detail,
       events,
       eventsLoading,
+      eventHighlights,
+      eventHighlightsLoading,
       restaurants,
       restaurantsLoading,
       favorites,
@@ -232,6 +272,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       detail,
       events,
       eventsLoading,
+      eventHighlights,
+      eventHighlightsLoading,
       restaurants,
       restaurantsLoading,
       favorites,

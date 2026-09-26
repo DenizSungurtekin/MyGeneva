@@ -5,10 +5,12 @@ from typing import List, Optional
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import and_, desc, func
 from sqlmodel import Session, select
 
 from app.database import get_session
 from app.models.event import Event, EventCategory
+from app.models.favorite import Favorite, FavoriteItemType
 from app.schemas.event import EventCreate, EventRead, EventUpdate
 
 router = APIRouter(prefix="/events", tags=["events"])
@@ -86,6 +88,42 @@ def list_events(
         query = query.where(Event.category == category)
     query = query.order_by(Event.date_start.asc())
     return list(session.exec(query).all())
+
+
+@router.get("/highlights", response_model=List[EventRead])
+def list_event_highlights(
+    category: Optional[EventCategory] = Query(default=None),
+    day: Optional[date] = Query(default=None, alias="date"),
+    limit: int = Query(default=3, ge=1, le=20),
+    session: Session = Depends(get_session),
+) -> List[Event]:
+    """Top `limit` events for the given day + category, ranked by favorites.
+
+    Ordering: primary by number of favorites (desc), tiebreak by RANDOM()
+    (so events with the same favorite count — including all events with 0
+    favorites — get shuffled). Reuses the same day-window semantics as
+    /events (double-category, 8h next-day rule for journée).
+    """
+    fav_count = func.count(Favorite.id).label("fav_count")
+    query = (
+        select(Event, fav_count)
+        .outerjoin(
+            Favorite,
+            and_(
+                Favorite.item_type == FavoriteItemType.event,
+                Favorite.item_id == Event.id,
+            ),
+        )
+        .group_by(Event.id)
+        .order_by(desc(fav_count), func.random())
+        .limit(limit)
+    )
+    if day is not None:
+        query = _apply_day_filter(query, day, category)
+    elif category is not None:
+        query = query.where(Event.category == category)
+    rows = session.exec(query).all()
+    return [row[0] for row in rows]
 
 
 @router.get("/{event_id}", response_model=EventRead)

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
+from app.models.favorite import Favorite, FavoriteItemType
+
 
 def _event_payload(**overrides):
     now = datetime(2026, 9, 23, 20, 0, tzinfo=timezone.utc)
@@ -197,6 +199,98 @@ def test_delete_event(client):
     response = client.delete(f"/events/{created['id']}")
     assert response.status_code == 204
     assert client.get(f"/events/{created['id']}").status_code == 404
+
+
+def _seed_favorites(session, event_id: int, count: int) -> None:
+    """Insert `count` favorite rows for one event, each with a unique user_id.
+
+    Bypasses the POST /favorites endpoint (which enforces uniqueness per
+    user_id) so tests can simulate real popularity across many users.
+    """
+    for i in range(count):
+        session.add(
+            Favorite(
+                user_id=f"user-{event_id}-{i}",
+                item_type=FavoriteItemType.event,
+                item_id=event_id,
+            )
+        )
+    session.commit()
+
+
+def test_highlights_orders_by_favorite_count(client, session):
+    day = "2026-05-01"
+    a = client.post("/events", json=_event_payload(title="A", date_start=f"{day}T18:00:00+00:00", date_end=None)).json()
+    b = client.post("/events", json=_event_payload(title="B", date_start=f"{day}T19:00:00+00:00", date_end=None)).json()
+    c = client.post("/events", json=_event_payload(title="C", date_start=f"{day}T20:00:00+00:00", date_end=None)).json()
+    _seed_favorites(session, a["id"], 0)
+    _seed_favorites(session, b["id"], 2)
+    _seed_favorites(session, c["id"], 1)
+
+    resp = client.get("/events/highlights", params={"date": day, "limit": 3})
+    assert resp.status_code == 200
+    titles = [e["title"] for e in resp.json()]
+    assert titles == ["B", "C", "A"]
+
+
+def test_highlights_random_when_no_favorites(client):
+    """With 0 favorites everywhere, we still get `limit` events (order random)."""
+    day = "2026-05-02"
+    for name in ("A", "B", "C", "D", "E"):
+        client.post(
+            "/events",
+            json=_event_payload(title=name, date_start=f"{day}T18:00:00+00:00", date_end=None),
+        )
+    resp = client.get("/events/highlights", params={"date": day, "limit": 3})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body) == 3
+    assert all(e["title"] in {"A", "B", "C", "D", "E"} for e in body)
+
+
+def test_highlights_one_favorite_pinned_others_random(client, session):
+    day = "2026-05-03"
+    starred = client.post(
+        "/events",
+        json=_event_payload(title="Starred", date_start=f"{day}T18:00:00+00:00", date_end=None),
+    ).json()
+    for name in ("A", "B", "C"):
+        client.post(
+            "/events",
+            json=_event_payload(title=name, date_start=f"{day}T19:00:00+00:00", date_end=None),
+        )
+    _seed_favorites(session, starred["id"], 1)
+
+    resp = client.get("/events/highlights", params={"date": day, "limit": 3})
+    body = resp.json()
+    assert body[0]["title"] == "Starred"
+    assert len(body) == 3
+
+
+def test_highlights_respects_category_filter(client, session):
+    day = "2026-05-04"
+    j = client.post(
+        "/events",
+        json=_event_payload(title="Jday", category="journee", date_start=f"{day}T10:00:00+00:00", date_end=None),
+    ).json()
+    s = client.post(
+        "/events",
+        json=_event_payload(title="Snight", category="soiree", date_start=f"{day}T22:00:00+00:00", date_end=None),
+    ).json()
+    _seed_favorites(session, j["id"], 5)   # journée is very popular
+    _seed_favorites(session, s["id"], 1)
+
+    resp = client.get(
+        "/events/highlights", params={"date": day, "category": "soiree", "limit": 3}
+    )
+    titles = [e["title"] for e in resp.json()]
+    assert titles == ["Snight"]           # journée doesn't leak into soirée query
+
+
+def test_highlights_empty_day_returns_empty(client):
+    resp = client.get("/events/highlights", params={"date": "2026-05-05", "limit": 3})
+    assert resp.status_code == 200
+    assert resp.json() == []
 
 
 def test_events_sorted_by_start(client):

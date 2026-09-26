@@ -22,6 +22,8 @@ export function HomeScreen() {
     setCategory,
     events,
     eventsLoading,
+    eventHighlights,
+    eventHighlightsLoading,
     restaurants,
     restaurantsLoading,
     isFavorite,
@@ -33,13 +35,19 @@ export function HomeScreen() {
 
   const targetCategory = category === 'restaurant' ? null : (category as EventCategory);
 
-  const items = useMemo(() => {
+  // Full list is used to decide whether "Voir tout" is worth showing.
+  const fullItems = useMemo(() => {
     if (category === 'restaurant') return restaurants;
     return events.filter((e) => e.category === targetCategory);
   }, [category, events, restaurants, targetCategory]);
 
-  const preview = items.slice(0, PREVIEW_LIMIT);
-  const isLoading = category === 'restaurant' ? restaurantsLoading : eventsLoading;
+  // Preview shown on the home is:
+  // - restaurants: first N (no ranking signal yet)
+  // - events: /events/highlights, ranked by favorite count, tiebreak random.
+  const preview =
+    category === 'restaurant' ? restaurants.slice(0, PREVIEW_LIMIT) : eventHighlights;
+  const isLoading =
+    category === 'restaurant' ? restaurantsLoading : eventHighlightsLoading;
 
   const styles = useMemo(
     () =>
@@ -120,8 +128,8 @@ export function HomeScreen() {
 
       <SectionHeader
         title={category === 'restaurant' ? 'À déguster' : 'Sélection du jour'}
-        actionLabel={items.length > PREVIEW_LIMIT ? 'Voir tout' : undefined}
-        onAction={items.length > PREVIEW_LIMIT ? () => setScreen('liste') : undefined}
+        actionLabel={fullItems.length > PREVIEW_LIMIT ? 'Voir tout' : undefined}
+        onAction={fullItems.length > PREVIEW_LIMIT ? () => setScreen('liste') : undefined}
       />
 
       {isLoading ? (
