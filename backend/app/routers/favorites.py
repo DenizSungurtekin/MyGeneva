@@ -9,6 +9,7 @@ from app.config import settings
 from app.database import get_session
 from app.models.event import Event
 from app.models.favorite import Favorite, FavoriteItemType
+from app.models.place import Place
 from app.models.restaurant import Restaurant
 from app.schemas.favorite import FavoriteCreate, FavoriteRead
 
@@ -22,6 +23,8 @@ def _target_exists(
         return session.get(Event, item_id) is not None
     if item_type == FavoriteItemType.restaurant:
         return session.get(Restaurant, item_id) is not None
+    if item_type == FavoriteItemType.place:
+        return session.get(Place, item_id) is not None
     return False
 
 

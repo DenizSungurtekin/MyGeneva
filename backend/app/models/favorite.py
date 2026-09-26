@@ -10,6 +10,7 @@ from sqlmodel import Field, SQLModel
 class FavoriteItemType(str, Enum):
     event = "event"
     restaurant = "restaurant"
+    place = "place"
 
 
 def _utcnow() -> datetime:

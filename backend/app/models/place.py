@@ -1,44 +1,30 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from enum import Enum
 from typing import Optional
 
 from sqlmodel import Field, SQLModel
-
-
-class EventCategory(str, Enum):
-    journee = "journee"
-    soiree = "soiree"
 
 
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
-class Event(SQLModel, table=True):
-    __tablename__ = "events"
+class Place(SQLModel, table=True):
+    __tablename__ = "places"
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    title: str = Field(index=True)
-    description: str = ""
-    category: EventCategory = Field(index=True)
-
-    location_name: str = ""
+    name: str = Field(index=True)
+    address: str = ""
     latitude: Optional[float] = None
     longitude: Optional[float] = None
-    address: str = ""
-
-    date_start: datetime = Field(index=True)
-    date_end: Optional[datetime] = None
-
     image_url: Optional[str] = None
+    description: str = ""
 
+    # source = "ladecadanse" | "manual" (curated by hand)
+    # external_id = idL from ladecadanse when source-scraped, null for manual entries
     source: Optional[str] = Field(default=None, index=True)
-    source_url: Optional[str] = None
     external_id: Optional[str] = Field(default=None, index=True)
-    place_id: Optional[int] = Field(default=None, foreign_key="places.id", index=True)
-    is_verified: bool = Field(default=False)
 
     created_at: datetime = Field(default_factory=_utcnow, nullable=False)
     updated_at: datetime = Field(default_factory=_utcnow, nullable=False)

@@ -21,6 +21,7 @@ class EventCreate(BaseModel):
     image_url: Optional[str] = None
     source: Optional[str] = None
     source_url: Optional[str] = None
+    place_id: Optional[int] = None
     is_verified: bool = False
 
 
@@ -37,6 +38,7 @@ class EventUpdate(BaseModel):
     image_url: Optional[str] = None
     source: Optional[str] = None
     source_url: Optional[str] = None
+    place_id: Optional[int] = None
     is_verified: Optional[bool] = None
 
 
@@ -56,6 +58,7 @@ class EventRead(BaseModel):
     image_url: Optional[str] = None
     source: Optional[str] = None
     source_url: Optional[str] = None
+    place_id: Optional[int] = None
     is_verified: bool
     created_at: datetime
     updated_at: datetime

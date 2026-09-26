@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.routers import events, favorites, restaurants
+from app.routers import events, favorites, places, restaurants
 
 
 def create_app() -> FastAPI:
@@ -23,6 +23,7 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(events.router)
+    app.include_router(places.router)
     app.include_router(restaurants.router)
     app.include_router(favorites.router)
 
