@@ -214,13 +214,17 @@ export function HomeScreen() {
           );
         }
         const e = item as EventItem;
+        // Show the category chip only when the event's category doesn't match
+        // the currently-selected tab. Explains why a journée event shows up
+        // in the soirée feed (double-cat: it runs past 17h) without cluttering
+        // the common case where category is redundant with the active tab.
         return (
           <EventCard
             event={e}
             favorite={isFavorite('event', e.id)}
             onPress={() => openDetail({ type: 'event', id: e.id, origin: 'accueil' })}
             onToggleFavorite={() => toggleFavorite('event', e.id)}
-            showCategoryChip={false}
+            showCategoryChip={e.category !== category}
           />
         );
       }}
