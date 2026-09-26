@@ -1,6 +1,14 @@
 import { Feather } from '@expo/vector-icons';
 import React, { useMemo } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  FlatList,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 
 import { CategoryTabs } from '../components/CategoryTabs';
 import { DayPicker } from '../components/DayPicker';
@@ -8,11 +16,11 @@ import { EventCard } from '../components/EventCard';
 import { RestaurantCard } from '../components/RestaurantCard';
 import { SectionHeader } from '../components/SectionHeader';
 import { useApp } from '../state/AppContext';
-import { spacing, useTheme } from '../theme';
-import { EventCategory } from '../types/api';
+import { radius, spacing, useTheme } from '../theme';
+import { EventItem, RestaurantItem } from '../types/api';
 import { longDayLabel } from '../utils/date';
 
-const PREVIEW_LIMIT = 3;
+type FeedItem = EventItem | RestaurantItem;
 
 export function HomeScreen() {
   const {
@@ -20,34 +28,25 @@ export function HomeScreen() {
     setSelectedDay,
     category,
     setCategory,
-    events,
-    eventsLoading,
-    eventHighlights,
-    eventHighlightsLoading,
+    eventFeed,
+    eventFeedLoading,
     restaurants,
     restaurantsLoading,
     isFavorite,
     toggleFavorite,
     openDetail,
-    setScreen,
+    searchQuery,
+    setSearchQuery,
   } = useApp();
   const { theme, mode, toggle } = useTheme();
 
-  const targetCategory = category === 'restaurant' ? null : (category as EventCategory);
-
-  // Full list is used to decide whether "Voir tout" is worth showing.
-  const fullItems = useMemo(() => {
-    if (category === 'restaurant') return restaurants;
-    return events.filter((e) => e.category === targetCategory);
-  }, [category, events, restaurants, targetCategory]);
-
-  // Preview shown on the home is:
-  // - restaurants: first N (no ranking signal yet)
-  // - events: /events/highlights, ranked by favorite count, tiebreak random.
-  const preview =
-    category === 'restaurant' ? restaurants.slice(0, PREVIEW_LIMIT) : eventHighlights;
-  const isLoading =
-    category === 'restaurant' ? restaurantsLoading : eventHighlightsLoading;
+  // Restaurant tab is currently hidden (CategoryTabs.ORDER); the branch
+  // here stays so bringing it back is a one-line switch.
+  const isRestaurant = category === 'restaurant';
+  const data: FeedItem[] = isRestaurant ? restaurants : eventFeed;
+  const isLoading = isRestaurant ? restaurantsLoading : eventFeedLoading;
+  const trimmedSearch = searchQuery.trim();
+  const searchActive = trimmedSearch.length >= 3;
 
   const styles = useMemo(
     () =>
@@ -83,6 +82,31 @@ export function HomeScreen() {
           marginLeft: spacing.sm,
           marginTop: 2,
         },
+        filterRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: spacing.sm,
+          paddingHorizontal: spacing.lg,
+          marginTop: spacing.md,
+        },
+        searchInput: {
+          flex: 1,
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: spacing.xs,
+          paddingHorizontal: spacing.sm,
+          paddingVertical: 6,
+          borderRadius: radius.pill,
+          borderWidth: 1,
+          borderColor: theme.colors.border,
+          backgroundColor: theme.colors.soft,
+        },
+        searchText: {
+          flex: 1,
+          ...theme.text.meta,
+          color: theme.colors.text,
+          padding: 0,
+        },
         loader: {
           marginTop: spacing.lg,
         },
@@ -90,17 +114,14 @@ export function HomeScreen() {
           ...theme.text.body,
           color: theme.colors.textMuted,
           paddingHorizontal: spacing.lg,
-          marginTop: spacing.sm,
+          marginTop: spacing.md,
         },
       }),
     [theme],
   );
 
-  return (
-    <ScrollView
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-    >
+  const header = (
+    <View>
       <View style={styles.header}>
         <View style={styles.headerText}>
           <Text style={theme.text.eyebrow}>Aujourd'hui à Genève</Text>
@@ -123,51 +144,84 @@ export function HomeScreen() {
 
       <DayPicker value={selectedDay} onChange={setSelectedDay} />
 
-      <View style={{ height: spacing.md }} />
-      <CategoryTabs value={category} onChange={setCategory} />
+      <View style={styles.filterRow}>
+        <CategoryTabs value={category} onChange={setCategory} paddingHorizontal={0} />
+        <View style={styles.searchInput}>
+          <Feather name="search" size={16} color={theme.colors.textMuted} />
+          <TextInput
+            style={styles.searchText}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="Rechercher"
+            placeholderTextColor={theme.colors.textMuted}
+            returnKeyType="search"
+            autoCorrect={false}
+            autoCapitalize="none"
+          />
+          {searchQuery.length > 0 ? (
+            <Pressable
+              onPress={() => setSearchQuery('')}
+              accessibilityRole="button"
+              accessibilityLabel="Effacer la recherche"
+              hitSlop={8}
+            >
+              <Feather name="x" size={16} color={theme.colors.textMuted} />
+            </Pressable>
+          ) : null}
+        </View>
+      </View>
 
-      <SectionHeader
-        title={category === 'restaurant' ? 'À déguster' : 'Sélection du jour'}
-        actionLabel={fullItems.length > PREVIEW_LIMIT ? 'Voir tout' : undefined}
-        onAction={fullItems.length > PREVIEW_LIMIT ? () => setScreen('liste') : undefined}
-      />
+      <SectionHeader title="Pour Toi" />
+    </View>
+  );
 
-      {isLoading ? (
+  if (isLoading) {
+    return (
+      <View style={styles.content}>
+        {header}
         <ActivityIndicator style={styles.loader} color={theme.colors.text} />
-      ) : preview.length === 0 ? (
+      </View>
+    );
+  }
+
+  return (
+    <FlatList
+      contentContainerStyle={styles.content}
+      showsVerticalScrollIndicator={false}
+      ListHeaderComponent={header}
+      data={data}
+      keyExtractor={(item) => `${isRestaurant ? 'r' : 'e'}-${item.id}`}
+      ListEmptyComponent={
         <Text style={styles.emptyText}>
-          Rien de prévu pour ce moment-là. Change de jour ou reviens plus tard.
+          {searchActive
+            ? `Aucun événement ne contient "${trimmedSearch}" ce jour-là.`
+            : 'Rien de prévu pour ce moment-là. Change de jour ou reviens plus tard.'}
         </Text>
-      ) : (
-        preview.map((item) => {
-          if (category === 'restaurant') {
-            const r = item as (typeof restaurants)[number];
-            return (
-              <RestaurantCard
-                key={r.id}
-                restaurant={r}
-                favorite={isFavorite('restaurant', r.id)}
-                onPress={() =>
-                  openDetail({ type: 'restaurant', id: r.id, origin: 'accueil' })
-                }
-                onToggleFavorite={() => toggleFavorite('restaurant', r.id)}
-              />
-            );
-          }
-          const e = item as (typeof events)[number];
+      }
+      renderItem={({ item }) => {
+        if (isRestaurant) {
+          const r = item as RestaurantItem;
           return (
-            <EventCard
-              key={e.id}
-              event={e}
-              favorite={isFavorite('event', e.id)}
-              onPress={() => openDetail({ type: 'event', id: e.id, origin: 'accueil' })}
-              onToggleFavorite={() => toggleFavorite('event', e.id)}
+            <RestaurantCard
+              restaurant={r}
+              favorite={isFavorite('restaurant', r.id)}
+              onPress={() =>
+                openDetail({ type: 'restaurant', id: r.id, origin: 'accueil' })
+              }
+              onToggleFavorite={() => toggleFavorite('restaurant', r.id)}
             />
           );
-        })
-      )}
-
-      <View style={{ height: spacing.xxl }} />
-    </ScrollView>
+        }
+        const e = item as EventItem;
+        return (
+          <EventCard
+            event={e}
+            favorite={isFavorite('event', e.id)}
+            onPress={() => openDetail({ type: 'event', id: e.id, origin: 'accueil' })}
+            onToggleFavorite={() => toggleFavorite('event', e.id)}
+          />
+        );
+      }}
+    />
   );
 }

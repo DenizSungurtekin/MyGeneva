@@ -15,7 +15,7 @@ export function NavBar() {
   const { screen, setScreen } = useApp();
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
-  const active: ScreenName = screen === 'liste' || screen === 'detail' ? 'accueil' : screen;
+  const active: ScreenName = screen === 'detail' ? 'accueil' : screen;
 
   const styles = useMemo(
     () =>

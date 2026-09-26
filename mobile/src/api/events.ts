@@ -24,7 +24,7 @@ function toQueryString(params: EventHighlightsParams): string {
 export const eventsApi = {
   list: (params: EventListParams = {}) =>
     api.get<EventItem[]>(`/events${toQueryString(params)}`),
-  highlights: (params: EventHighlightsParams = {}) =>
-    api.get<EventItem[]>(`/events/highlights${toQueryString(params)}`),
+  forYou: (params: EventHighlightsParams = {}) =>
+    api.get<EventItem[]>(`/events/for-you${toQueryString(params)}`),
   get: (id: number) => api.get<EventItem>(`/events/${id}`),
 };

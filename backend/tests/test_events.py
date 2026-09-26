@@ -218,7 +218,7 @@ def _seed_favorites(session, event_id: int, count: int) -> None:
     session.commit()
 
 
-def test_highlights_orders_by_favorite_count(client, session):
+def test_for_you_orders_by_favorite_count(client, session):
     day = "2026-05-01"
     a = client.post("/events", json=_event_payload(title="A", date_start=f"{day}T18:00:00+00:00", date_end=None)).json()
     b = client.post("/events", json=_event_payload(title="B", date_start=f"{day}T19:00:00+00:00", date_end=None)).json()
@@ -227,13 +227,13 @@ def test_highlights_orders_by_favorite_count(client, session):
     _seed_favorites(session, b["id"], 2)
     _seed_favorites(session, c["id"], 1)
 
-    resp = client.get("/events/highlights", params={"date": day, "limit": 3})
+    resp = client.get("/events/for-you", params={"date": day, "limit": 3})
     assert resp.status_code == 200
     titles = [e["title"] for e in resp.json()]
     assert titles == ["B", "C", "A"]
 
 
-def test_highlights_random_when_no_favorites(client):
+def test_for_you_random_when_no_favorites(client):
     """With 0 favorites everywhere, we still get `limit` events (order random)."""
     day = "2026-05-02"
     for name in ("A", "B", "C", "D", "E"):
@@ -241,14 +241,14 @@ def test_highlights_random_when_no_favorites(client):
             "/events",
             json=_event_payload(title=name, date_start=f"{day}T18:00:00+00:00", date_end=None),
         )
-    resp = client.get("/events/highlights", params={"date": day, "limit": 3})
+    resp = client.get("/events/for-you", params={"date": day, "limit": 3})
     assert resp.status_code == 200
     body = resp.json()
     assert len(body) == 3
     assert all(e["title"] in {"A", "B", "C", "D", "E"} for e in body)
 
 
-def test_highlights_one_favorite_pinned_others_random(client, session):
+def test_for_you_one_favorite_pinned_others_random(client, session):
     day = "2026-05-03"
     starred = client.post(
         "/events",
@@ -261,13 +261,13 @@ def test_highlights_one_favorite_pinned_others_random(client, session):
         )
     _seed_favorites(session, starred["id"], 1)
 
-    resp = client.get("/events/highlights", params={"date": day, "limit": 3})
+    resp = client.get("/events/for-you", params={"date": day, "limit": 3})
     body = resp.json()
     assert body[0]["title"] == "Starred"
     assert len(body) == 3
 
 
-def test_highlights_respects_category_filter(client, session):
+def test_for_you_respects_category_filter(client, session):
     day = "2026-05-04"
     j = client.post(
         "/events",
@@ -281,14 +281,14 @@ def test_highlights_respects_category_filter(client, session):
     _seed_favorites(session, s["id"], 1)
 
     resp = client.get(
-        "/events/highlights", params={"date": day, "category": "soiree", "limit": 3}
+        "/events/for-you", params={"date": day, "category": "soiree", "limit": 3}
     )
     titles = [e["title"] for e in resp.json()]
     assert titles == ["Snight"]           # journée doesn't leak into soirée query
 
 
-def test_highlights_empty_day_returns_empty(client):
-    resp = client.get("/events/highlights", params={"date": "2026-05-05", "limit": 3})
+def test_for_you_empty_day_returns_empty(client):
+    resp = client.get("/events/for-you", params={"date": "2026-05-05", "limit": 3})
     assert resp.status_code == 200
     assert resp.json() == []
 

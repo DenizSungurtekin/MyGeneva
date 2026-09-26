@@ -21,7 +21,7 @@ import {
 } from '../types/api';
 import { toISODate } from '../utils/date';
 
-export type ScreenName = 'accueil' | 'liste' | 'detail' | 'favoris';
+export type ScreenName = 'accueil' | 'detail' | 'favoris';
 
 export interface DetailTarget {
   type: FavoriteItemType;
@@ -35,10 +35,8 @@ interface AppState {
   selectedDay: Date;
   detail: DetailTarget | null;
 
-  events: EventItem[];
-  eventsLoading: boolean;
-  eventHighlights: EventItem[];
-  eventHighlightsLoading: boolean;
+  eventFeed: EventItem[];
+  eventFeedLoading: boolean;
   restaurants: RestaurantItem[];
   restaurantsLoading: boolean;
 
@@ -47,12 +45,9 @@ interface AppState {
   favoriteEvents: EventItem[];
   favoriteRestaurants: RestaurantItem[];
 
-  // ListScreen search state — kept at app level so navigating to Detail and
-  // back preserves the user's active query + results.
-  listSearchQuery: string;
-  listSearchResults: EventItem[];
-  listSearchLoading: boolean;
-  setListSearchQuery: (q: string) => void;
+  // Home search — persists across navigation to Detail and back.
+  searchQuery: string;
+  setSearchQuery: (q: string) => void;
 
   error: string | null;
 
@@ -67,7 +62,7 @@ interface AppState {
   refreshAll: () => Promise<void>;
 }
 
-const LIST_SEARCH_MIN_CHARS = 3;
+const SEARCH_MIN_CHARS = 3;
 
 const AppContext = createContext<AppState | undefined>(undefined);
 
@@ -94,10 +89,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   });
   const [detail, setDetail] = useState<DetailTarget | null>(null);
 
-  const [events, setEvents] = useState<EventItem[]>([]);
-  const [eventsLoading, setEventsLoading] = useState(false);
-  const [eventHighlights, setEventHighlights] = useState<EventItem[]>([]);
-  const [eventHighlightsLoading, setEventHighlightsLoading] = useState(false);
+  const [eventFeed, setEventFeed] = useState<EventItem[]>([]);
+  const [eventFeedLoading, setEventFeedLoading] = useState(false);
   const [restaurants, setRestaurants] = useState<RestaurantItem[]>([]);
   const [restaurantsLoading, setRestaurantsLoading] = useState(false);
 
@@ -106,50 +99,41 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [favoriteEvents, setFavoriteEvents] = useState<EventItem[]>([]);
   const [favoriteRestaurants, setFavoriteRestaurants] = useState<RestaurantItem[]>([]);
 
-  const [listSearchQuery, setListSearchQuery] = useState<string>('');
-  const [listSearchResults, setListSearchResults] = useState<EventItem[]>([]);
-  const [listSearchLoading, setListSearchLoading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState<string>('');
 
   const [error, setError] = useState<string | null>(null);
 
-  const refreshEvents = useCallback(async () => {
-    setEventsLoading(true);
-    try {
-      const iso = toISODate(selectedDay);
-      const data = await eventsApi.list({ date: iso });
-      setEvents(data);
-      setError(null);
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setEventsLoading(false);
-    }
-  }, [selectedDay]);
-
-  const refreshEventHighlights = useCallback(async () => {
+  const refreshEventFeed = useCallback(async () => {
     const eventCategory = categoryToEventCategory(category);
     if (!eventCategory) {
-      // Restaurant tab doesn't use highlights — clear stale state so consumers
-      // fall back to their own preview logic.
-      setEventHighlights([]);
+      // Restaurant tab (hidden today) doesn't feed events.
+      setEventFeed([]);
       return;
     }
-    setEventHighlightsLoading(true);
+    setEventFeedLoading(true);
     try {
       const iso = toISODate(selectedDay);
-      const data = await eventsApi.highlights({
+      const trimmed = searchQuery.trim();
+      const params: {
+        date: string;
+        category: EventCategory;
+        search?: string;
+      } = {
         date: iso,
         category: eventCategory,
-        limit: 3,
-      });
-      setEventHighlights(data);
+      };
+      if (trimmed.length >= SEARCH_MIN_CHARS) {
+        params.search = trimmed;
+      }
+      const data = await eventsApi.forYou(params);
+      setEventFeed(data);
       setError(null);
     } catch (e) {
       setError((e as Error).message);
     } finally {
-      setEventHighlightsLoading(false);
+      setEventFeedLoading(false);
     }
-  }, [selectedDay, category]);
+  }, [selectedDay, category, searchQuery]);
 
   const refreshRestaurants = useCallback(async () => {
     setRestaurantsLoading(true);
@@ -196,59 +180,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const refreshAll = useCallback(async () => {
     await Promise.all([
-      refreshEvents(),
-      refreshEventHighlights(),
+      refreshEventFeed(),
       refreshRestaurants(),
       refreshFavorites(),
     ]);
-  }, [refreshEvents, refreshEventHighlights, refreshRestaurants, refreshFavorites]);
+  }, [refreshEventFeed, refreshRestaurants, refreshFavorites]);
 
+  // Feed refetches on day/category/search change. Debounce lives in the
+  // typing UX (search input) if we want to smooth network chatter later —
+  // for now every keystroke past the 3-char threshold fires a query.
   useEffect(() => {
-    refreshEvents();
-  }, [refreshEvents]);
-
-  useEffect(() => {
-    refreshEventHighlights();
-  }, [refreshEventHighlights]);
-
-  // ListScreen search: refetch when query or category changes. Query is
-  // trimmed and normalized before comparing to the min-chars threshold so
-  // "  ab " doesn't count as 4 chars.
-  useEffect(() => {
-    const trimmed = listSearchQuery.trim();
-    if (trimmed.length < LIST_SEARCH_MIN_CHARS) {
-      setListSearchResults([]);
-      setListSearchLoading(false);
-      return;
-    }
-    let cancelled = false;
-    setListSearchLoading(true);
-    const eventCategory = categoryToEventCategory(category);
-    eventsApi
-      .list({
-        search: trimmed,
-        date: toISODate(selectedDay),
-        ...(eventCategory ? { category: eventCategory } : {}),
-      })
-      .then((res) => {
-        if (!cancelled) setListSearchResults(res);
-      })
-      .catch(() => {
-        if (!cancelled) setListSearchResults([]);
-      })
-      .finally(() => {
-        if (!cancelled) setListSearchLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [listSearchQuery, category, selectedDay]);
+    refreshEventFeed();
+  }, [refreshEventFeed]);
 
   useEffect(() => {
     refreshRestaurants();
     refreshFavorites();
-    // Intentionally run once on mount for restaurants and favorites;
-    // refreshEvents is date-scoped and handles its own dependency.
+    // Intentionally run once on mount — restaurants + favorites don't depend
+    // on the currently-selected day.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -269,12 +218,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
         } else {
           await favoritesApi.add(type, itemId);
         }
-        await Promise.all([refreshFavorites(), refreshEventHighlights()]);
+        // A favorite count change may reshuffle the feed's ranking.
+        await Promise.all([refreshFavorites(), refreshEventFeed()]);
       } catch (e) {
         setError((e as Error).message);
       }
     },
-    [favorites, refreshFavorites, refreshEventHighlights],
+    [favorites, refreshFavorites, refreshEventFeed],
   );
 
   const openDetail = useCallback((target: DetailTarget) => {
@@ -299,20 +249,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
       category,
       selectedDay,
       detail,
-      events,
-      eventsLoading,
-      eventHighlights,
-      eventHighlightsLoading,
+      eventFeed,
+      eventFeedLoading,
       restaurants,
       restaurantsLoading,
       favorites,
       favoritesLoading,
       favoriteEvents,
       favoriteRestaurants,
-      listSearchQuery,
-      listSearchResults,
-      listSearchLoading,
-      setListSearchQuery,
+      searchQuery,
+      setSearchQuery,
       error,
       setScreen,
       setCategory,
@@ -328,19 +274,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
       category,
       selectedDay,
       detail,
-      events,
-      eventsLoading,
-      eventHighlights,
-      eventHighlightsLoading,
+      eventFeed,
+      eventFeedLoading,
       restaurants,
       restaurantsLoading,
       favorites,
       favoritesLoading,
       favoriteEvents,
       favoriteRestaurants,
-      listSearchQuery,
-      listSearchResults,
-      listSearchLoading,
+      searchQuery,
       error,
       openDetail,
       closeDetail,

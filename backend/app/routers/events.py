@@ -102,19 +102,28 @@ def list_events(
     return list(session.exec(query).all())
 
 
-@router.get("/highlights", response_model=List[EventRead])
-def list_event_highlights(
+@router.get("/for-you", response_model=List[EventRead])
+def list_event_feed(
     category: Optional[EventCategory] = Query(default=None),
     day: Optional[date] = Query(default=None, alias="date"),
-    limit: int = Query(default=3, ge=1, le=20),
+    search: Optional[str] = Query(default=None, min_length=0, max_length=200),
+    limit: Optional[int] = Query(default=None, ge=1, le=200),
     session: Session = Depends(get_session),
 ) -> List[Event]:
-    """Top `limit` events for the given day + category, ranked by favorites.
+    """Personalised feed of events for a day+category.
 
-    Ordering: primary by number of favorites (desc), tiebreak by RANDOM()
-    (so events with the same favorite count — including all events with 0
-    favorites — get shuffled). Reuses the same day-window semantics as
-    /events (double-category, 8h next-day rule for journée).
+    Current ranking (weakest → strongest tiebreak):
+      1. RANDOM() — baseline shuffle for events with the same favorite count.
+      2. COUNT(favorites) DESC — popular events float up.
+
+    Reserved for later:
+      - is_promoted DESC (Phase 4) — commercial partnerships.
+      - favorite-place membership DESC (Phase 3) — events at places the user
+        already favorited.
+
+    Reuses the same day-window semantics as /events (double-category rule,
+    8h next-day cutoff for journée). Accepts a `search` keyword that filters
+    by title|description ILIKE.
     """
     fav_count = func.count(Favorite.id).label("fav_count")
     query = (
@@ -128,12 +137,18 @@ def list_event_highlights(
         )
         .group_by(Event.id)
         .order_by(desc(fav_count), func.random())
-        .limit(limit)
     )
     if day is not None:
         query = _apply_day_filter(query, day, category)
     elif category is not None:
         query = query.where(Event.category == category)
+    if search is not None and len(search.strip()) >= SEARCH_MIN_CHARS:
+        pattern = f"%{search.strip()}%"
+        query = query.where(
+            Event.title.ilike(pattern) | Event.description.ilike(pattern)
+        )
+    if limit is not None:
+        query = query.limit(limit)
     rows = session.exec(query).all()
     return [row[0] for row in rows]
 
