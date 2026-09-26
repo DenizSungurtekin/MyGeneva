@@ -3,7 +3,11 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { categoryLabel, CategoryKey, radius, spacing, useTheme } from '../theme';
 
-const ORDER: CategoryKey[] = ['journee', 'soiree', 'restaurant'];
+// Restaurant tab intentionally hidden — the feature isn't ready yet.
+// Backend endpoints, model, and detail path stay in place so the tab can be
+// re-enabled with a single line when we bring restaurants back (probably as
+// "restaurants near this event" contextual, not a standalone browse).
+const ORDER: CategoryKey[] = ['journee', 'soiree'];
 
 interface Props {
   value: CategoryKey;

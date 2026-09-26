@@ -68,6 +68,13 @@ function categoryToEventCategory(c: CategoryKey): EventCategory | null {
   return null;
 }
 
+function isEventInFuture(event: EventItem): boolean {
+  // A favourite is kept as long as the event hasn't finished. Use date_end
+  // when the source provided one, else fall back to date_start (best guess).
+  const endIso = event.date_end ?? event.date_start;
+  return new Date(endIso).getTime() >= Date.now();
+}
+
 export function AppProvider({ children }: { children: ReactNode }) {
   const [screen, setScreen] = useState<ScreenName>('accueil');
   const [category, setCategory] = useState<CategoryKey>('journee');
@@ -163,7 +170,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
           restFavIds.map((id) => restaurantsApi.get(id).catch(() => null)),
         ),
       ]);
-      setFavoriteEvents(evts.filter(Boolean) as EventItem[]);
+      const upcomingEvents = (evts.filter(Boolean) as EventItem[]).filter(isEventInFuture);
+      setFavoriteEvents(upcomingEvents);
       setFavoriteRestaurants(rsts.filter(Boolean) as RestaurantItem[]);
       setError(null);
     } catch (e) {
