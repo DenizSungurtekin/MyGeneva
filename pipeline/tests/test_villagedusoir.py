@@ -26,6 +26,10 @@ def test_parse_extracts_expected_fields():
     assert girls.genre == "fetes"
     # 22h local Zurich CEST (Sep) = 20h UTC.
     assert girls.date_start.astimezone(timezone.utc).hour == 20
+    # All VdS events share the single hardcoded venue so the runner can create
+    # one Place row and link them all.
+    assert girls.venue_name == "Le Village du Soir"
+    assert girls.place_external_id == "main"
 
 
 def test_fetch_filters_by_local_date(monkeypatch):

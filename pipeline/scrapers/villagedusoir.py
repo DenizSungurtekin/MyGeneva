@@ -37,6 +37,14 @@ LOCAL_TZ = ZoneInfo("Europe/Zurich")
 CRAWL_DELAY_S = 5
 CACHE_TTL_S = 300   # a single CLI run rarely runs longer than this
 
+# Every VdS event happens at the same physical venue — Le Village du Soir
+# at Grand-Lancy. Hardcode a name + stable external_id so the runner's
+# _upsert_place creates one shared Place row for all VdS events. Google
+# Places enrichment (POST /places/{id}/refresh) can then fill in the exact
+# address, photo, and description from the venue's real listing.
+VENUE_NAME = "Le Village du Soir"
+VENUE_EXTERNAL_ID = "main"
+
 _cache: dict = {"fetched_at": 0.0, "events": None}
 
 
@@ -116,13 +124,13 @@ def _parse_event_article(article: Tag) -> Optional[EventRaw]:
         title=title,
         date_start=date_start,
         date_end=None,
-        genre="fetes",   # VdS is nightlife-focused; all listings are "soirée"
-        venue_name="",   # no venue name on the listing (only city)
+        genre="fetes",              # VdS is nightlife-focused; all listings are "soirée"
+        venue_name=VENUE_NAME,      # every VdS event is at this single venue
         address=address,
         description="",
         source_url=detail_url,
         image_url=image_url,
-        place_external_id=None,
+        place_external_id=VENUE_EXTERNAL_ID,
     )
 
 
