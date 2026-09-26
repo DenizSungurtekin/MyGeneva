@@ -26,7 +26,8 @@ def test_parse_extracts_title_venue_address_and_source_url():
     assert e.venue_name == "Motel Campo"
     assert e.address == "Route des Jeunes 12 - Genève"
     assert e.source_url == "https://www.ladecadanse.ch/event/evenement.php?idE=999001"
-    assert e.image_url.endswith("s_999001_thumb.jpg")
+    # Full-res URL (from <a href>), not the thumbnail (<img src>).
+    assert e.image_url.endswith("999001_big.jpg")
     assert e.description.startswith("DJ set")
     assert e.genre == "fetes"
 

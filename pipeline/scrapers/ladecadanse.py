@@ -114,11 +114,21 @@ def _parse_article(article: Tag, *, genre: str, fallback_date: date) -> Optional
     address = _text(article.select_one("div.pratique span.left"))
     description = _text(article.select_one("div.event-media div.description p"))
 
-    img = article.select_one("div.event-media figure img")
+    # Prefer the full-resolution image from the <figure><a href> (opened by
+    # the lightbox) over the thumbnail served in <img src>. The `<img>` is
+    # sized for the listing thumbnail (~100px wide, blurry when stretched
+    # to a detail-page hero). The `<a href>` points to the original upload.
     image_url = ""
-    if img and img.get("src"):
-        src = img["src"]
-        image_url = src if src.startswith("http") else BASE_URL + src
+    figure_link = article.select_one("div.event-media figure.flyer a[href]")
+    if figure_link:
+        href = figure_link.get("href", "")
+        if href:
+            image_url = href if href.startswith("http") else BASE_URL + href
+    if not image_url:
+        img = article.select_one("div.event-media figure img")
+        if img and img.get("src"):
+            src = img["src"]
+            image_url = src if src.startswith("http") else BASE_URL + src
 
     times = _parse_gcal_dates(article)
     if times is not None:
