@@ -39,6 +39,7 @@ class Event(SQLModel, table=True):
     external_id: Optional[str] = Field(default=None, index=True)
     place_id: Optional[int] = Field(default=None, foreign_key="places.id", index=True)
     is_verified: bool = Field(default=False)
+    is_promoted: bool = Field(default=False, index=True)
 
     created_at: datetime = Field(default_factory=_utcnow, nullable=False)
     updated_at: datetime = Field(default_factory=_utcnow, nullable=False)

@@ -136,7 +136,12 @@ def list_event_feed(
             ),
         )
         .group_by(Event.id)
-        .order_by(desc(fav_count), func.random())
+        # Ranking priority (top → bottom):
+        #   1. promoted events (commercial partnerships)
+        #   2. events with the most favorites
+        #   3. RANDOM() tiebreak
+        # Reserved for later: favorite-place membership between (1) and (2).
+        .order_by(desc(Event.is_promoted), desc(fav_count), func.random())
     )
     if day is not None:
         query = _apply_day_filter(query, day, category)
@@ -181,6 +186,29 @@ def update_event(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
     for key, value in payload.model_dump(exclude_unset=True).items():
         setattr(event, key, value)
+    event.updated_at = datetime.now(timezone.utc)
+    session.add(event)
+    session.commit()
+    session.refresh(event)
+    return event
+
+
+@router.patch("/{event_id}/promote", response_model=EventRead)
+def set_event_promoted(
+    event_id: int,
+    promoted: bool = Query(default=True),
+    session: Session = Depends(get_session),
+) -> Event:
+    """Toggle the commercial-partnership flag on an event.
+
+    No auth today — the endpoint is open. Note this in docs when adding
+    real users. Backend calls this manually via curl / DataGrip until
+    an admin surface exists.
+    """
+    event = session.get(Event, event_id)
+    if event is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
+    event.is_promoted = promoted
     event.updated_at = datetime.now(timezone.utc)
     session.add(event)
     session.commit()

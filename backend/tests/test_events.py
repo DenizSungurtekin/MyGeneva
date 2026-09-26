@@ -287,6 +287,45 @@ def test_for_you_respects_category_filter(client, session):
     assert titles == ["Snight"]           # journée doesn't leak into soirée query
 
 
+def test_promoted_events_float_to_top(client, session):
+    """is_promoted=True beats favorite count in the ranking."""
+    day = "2026-06-01"
+    unpromoted = client.post(
+        "/events",
+        json=_event_payload(title="Popular", date_start=f"{day}T18:00:00+00:00", date_end=None),
+    ).json()
+    promoted = client.post(
+        "/events",
+        json=_event_payload(title="Sponsored", date_start=f"{day}T18:00:00+00:00", date_end=None),
+    ).json()
+    # 5 favorites on the popular one, 0 on the promoted → without the flag
+    # Popular would win. Promote the sponsored event.
+    _seed_favorites(session, unpromoted["id"], 5)
+    resp = client.patch(f"/events/{promoted['id']}/promote", params={"promoted": True})
+    assert resp.status_code == 200
+    assert resp.json()["is_promoted"] is True
+
+    body = client.get("/events/for-you", params={"date": day}).json()
+    assert [e["title"] for e in body] == ["Sponsored", "Popular"]
+
+
+def test_promote_endpoint_can_unset(client):
+    day = "2026-06-02"
+    e = client.post(
+        "/events",
+        json=_event_payload(title="Was Sponsored", date_start=f"{day}T18:00:00+00:00", date_end=None),
+    ).json()
+    client.patch(f"/events/{e['id']}/promote", params={"promoted": True})
+    resp = client.patch(f"/events/{e['id']}/promote", params={"promoted": False})
+    assert resp.status_code == 200
+    assert resp.json()["is_promoted"] is False
+
+
+def test_promote_endpoint_404(client):
+    resp = client.patch("/events/9999/promote", params={"promoted": True})
+    assert resp.status_code == 404
+
+
 def test_for_you_empty_day_returns_empty(client):
     resp = client.get("/events/for-you", params={"date": "2026-05-05", "limit": 3})
     assert resp.status_code == 200
