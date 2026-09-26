@@ -58,18 +58,46 @@ def test_list_events_filter_by_date(client):
     assert titles == ["Day1"]
 
 
-def test_list_events_date_overlap(client):
-    # Multi-day event: starts day 4, ends day 6. Querying day 5 should include it.
+def test_list_events_date_overlap_journee(client):
+    # Multi-day journée event (marché Sat–Sun): should appear on the middle day too.
     start = datetime(2026, 3, 4, 22, 0, tzinfo=timezone.utc)
     end = datetime(2026, 3, 6, 2, 0, tzinfo=timezone.utc)
     client.post(
         "/events",
-        json=_event_payload(title="Overlap", date_start=start.isoformat(), date_end=end.isoformat()),
+        json=_event_payload(
+            title="Overlap",
+            category="journee",
+            date_start=start.isoformat(),
+            date_end=end.isoformat(),
+        ),
     )
 
     response = client.get("/events", params={"date": "2026-03-05"})
     titles = [item["title"] for item in response.json()]
     assert titles == ["Overlap"]
+
+
+def test_list_events_soiree_stays_on_start_day(client):
+    """A Fri-night party ending Sat morning belongs to Friday, not Saturday."""
+    start = datetime(2026, 3, 5, 21, 0, tzinfo=timezone.utc)   # Thu 21h UTC = Fri 22h CET
+    end = datetime(2026, 3, 6, 4, 0, tzinfo=timezone.utc)      # crosses midnight
+    client.post(
+        "/events",
+        json=_event_payload(
+            title="Night",
+            category="soiree",
+            date_start=start.isoformat(),
+            date_end=end.isoformat(),
+        ),
+    )
+
+    # Present on the start day.
+    on_start = client.get("/events", params={"date": "2026-03-05"}).json()
+    assert [e["title"] for e in on_start] == ["Night"]
+
+    # Absent on the next day — even though the event technically spans into it.
+    on_next = client.get("/events", params={"date": "2026-03-06"}).json()
+    assert [e["title"] for e in on_next] == []
 
 
 def test_get_event_not_found(client):

@@ -55,6 +55,18 @@ Idées et améliorations mises de côté volontairement, avec le contexte de la 
 
 ---
 
+## Config `geneva_only` par source (à ajouter au registry le jour venu)
+
+**Statut** : reporté (2026-09-26).
+**Contexte** : `pipeline/runner.py::_is_geneva` filtre en dur toute event dont l'adresse ne se termine pas par "Genève". C'est bien pour ladecadanse (qui liste le Grand Bassin genevois entier — Vaud, France voisine), mais ça devient contre-productif si on ajoute une source déjà pré-filtrée sur Genève (opendata.swiss Ville de Genève, par exemple), ou une source où on veut au contraire couvrir le Grand Genève transfrontalier.
+
+**Ce qu'il faut faire** :
+- Ajouter `geneva_only: bool = True` sur la dataclass `Source` dans `pipeline/sources/registry.py`.
+- Dans `runner.py::run_source`, remplacer `if not _is_geneva(raw)` par `if source.geneva_only and not _is_geneva(raw)`.
+- Une source pré-filtrée (opendata Ville de GE) déclarerait `geneva_only=False` — pas besoin de re-filtrer.
+
+**Effort** : 5 min. À faire quand on ajoute la 2ᵉ source.
+
 ## Autres pistes évoquées en session, à formaliser plus tard
 
 - **Purge `scrape_runs.raw_html`** : la colonne est prête mais non peuplée (le scraper n'y envoie rien pour l'instant). Si on l'active, prévoir un job Airflow qui garde les N dernières runs par source, sinon la table grossit d'~1 MB/jour.

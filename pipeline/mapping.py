@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from typing import Literal
+from zoneinfo import ZoneInfo
 
 from pipeline.models import EventRaw
 from pipeline.sources.registry import Source
@@ -10,22 +11,27 @@ from pipeline.sources.registry import Source
 Category = Literal["journee", "soiree"]
 
 
-# Genre → target category. Sources can add their own genres over time; a
-# genre absent from this table falls back to the source's `category_hint`.
-_GENRE_TO_CATEGORY: dict[str, Category] = {
-    "fetes": "soiree",
-    "concerts": "soiree",
-    "cine": "journee",
-    "theatre": "journee",
-    "expos": "journee",
-    "divers": "journee",
-}
+# A local start-hour in [SOIREE_EVENING_START, 24) ∪ [0, SOIREE_NIGHT_END) is a
+# soirée. The two intervals cover both the "starting in the evening" case (17h+)
+# and the "starting after midnight but still nightlife" case (a party listed at
+# Sat 00:00 that's really the extension of Fri night).
+SOIREE_EVENING_START = 17
+SOIREE_NIGHT_END = 5
+LOCAL_TZ = ZoneInfo("Europe/Zurich")
 
 
 def resolve_category(raw: EventRaw, source: Source) -> Category:
-    cat = _GENRE_TO_CATEGORY.get(raw.genre)
-    if cat is not None:
-        return cat
+    """Category is decided by local start hour, not by the source's genre label.
+
+    An 08h désalpe classified by the source as "fêtes" is a daytime event; a
+    22h vernissage listed under "expos" is a soirée; a midnight techno set is
+    a soirée even though `hour == 0`. The hour is authoritative.
+    Falls back to the source's `category_hint` only if start hour is missing.
+    """
+    if raw.date_start is not None:
+        local_hour = raw.date_start.astimezone(LOCAL_TZ).hour
+        is_night = local_hour >= SOIREE_EVENING_START or local_hour < SOIREE_NIGHT_END
+        return "soiree" if is_night else "journee"
     if source.category_hint in ("journee", "soiree"):
         return source.category_hint  # type: ignore[return-value]
     return "journee"

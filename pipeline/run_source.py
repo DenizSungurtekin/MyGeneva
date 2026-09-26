@@ -45,7 +45,8 @@ def main() -> int:
     print(
         f"[{summary.source_name}] {summary.days} day(s) from {args.start}: "
         f"parsed={summary.parsed} inserted={summary.inserted} "
-        f"updated={summary.updated} empty_days={summary.empty_days}"
+        f"updated={summary.updated} skipped={summary.skipped} "
+        f"empty_days={summary.empty_days}"
     )
     if summary.errors:
         print("Errors:")

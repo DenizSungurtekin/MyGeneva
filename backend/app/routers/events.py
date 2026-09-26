@@ -14,21 +14,28 @@ router = APIRouter(prefix="/events", tags=["events"])
 
 
 def _apply_day_filter(query, day: date):
-    """Keep events overlapping the given day (UTC boundaries).
+    """Keep events relevant to the given day (UTC boundaries).
 
-    An event overlaps if it starts before end-of-day AND ends after start-of-day
-    (or starts within the day when it has no `date_end`).
+    Category-aware:
+    - `journee`: overlap. A marché running Sat–Sun appears on both days.
+    - `soiree`: start-day only. A Friday-night party ending Saturday 04h stays
+      on Friday — that's the natural "vendredi soir" mental model.
     """
     day_start = datetime.combine(day, time.min, tzinfo=timezone.utc)
     day_end = day_start + timedelta(days=1)
 
     starts_within_day = (Event.date_start >= day_start) & (Event.date_start < day_end)
-    overlaps_day = (
+    spans_across_day = (
         (Event.date_start < day_end)
         & (Event.date_end.is_not(None))
         & (Event.date_end > day_start)
     )
-    return query.where(starts_within_day | overlaps_day)
+
+    journee_match = (Event.category == EventCategory.journee) & (
+        starts_within_day | spans_across_day
+    )
+    soiree_match = (Event.category == EventCategory.soiree) & starts_within_day
+    return query.where(journee_match | soiree_match)
 
 
 @router.get("", response_model=List[EventRead])

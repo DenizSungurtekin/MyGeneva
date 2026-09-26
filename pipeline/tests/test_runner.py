@@ -56,11 +56,11 @@ def fake_source(monkeypatch, engine):
                 source_name="fakesrc",
                 external_id="1",
                 title="Event A",
-                date_start=datetime(2026, 9, 26, 22, 0, tzinfo=timezone.utc),
+                date_start=datetime(2026, 9, 26, 19, 0, tzinfo=timezone.utc),
                 date_end=None,
                 genre="fetes",
                 venue_name="Venue A",
-                address="Rue A",
+                address="Rue A - Genève",
                 description="",
                 source_url="https://example.com/1",
             ),
@@ -68,11 +68,11 @@ def fake_source(monkeypatch, engine):
                 source_name="fakesrc",
                 external_id="2",
                 title="Event B",
-                date_start=datetime(2026, 9, 26, 23, 0, tzinfo=timezone.utc),
+                date_start=datetime(2026, 9, 26, 20, 0, tzinfo=timezone.utc),
                 date_end=None,
                 genre="fetes",
                 venue_name="Venue B",
-                address="",
+                address="Rue B - Meyrin - Genève",
                 description="",
                 source_url="",
             ),
@@ -135,6 +135,80 @@ def test_empty_days_reported(engine, fake_source):
     _src, start = fake_source
     summary = runner.run_source("fakesrc", start=start, days=3, engine=engine)
     assert summary.empty_days == 2
+
+
+def test_non_geneva_events_are_skipped(engine, monkeypatch):
+    """Events with an address outside canton GE must not land in the DB."""
+    start = date(2026, 9, 26)
+    events_map = {
+        start: [
+            EventRaw(
+                source_name="fakesrc",
+                external_id="1",
+                title="Désalpe de St-Cergue",
+                date_start=datetime(2026, 9, 26, 8, 0, tzinfo=timezone.utc),
+                date_end=None,
+                genre="fetes",
+                venue_name="Place du Vallon",
+                address="Place du Vallon - St-Cergue - Vaud",
+                description="",
+                source_url="",
+            ),
+            EventRaw(
+                source_name="fakesrc",
+                external_id="2",
+                title="Ferney bal",
+                date_start=datetime(2026, 9, 26, 20, 0, tzinfo=timezone.utc),
+                date_end=None,
+                genre="fetes",
+                venue_name="Château",
+                address="All. du Château - Ferney-Voltaire - France",
+                description="",
+                source_url="",
+            ),
+            EventRaw(
+                source_name="fakesrc",
+                external_id="3",
+                title="Genève soirée",
+                date_start=datetime(2026, 9, 26, 21, 0, tzinfo=timezone.utc),
+                date_end=None,
+                genre="fetes",
+                venue_name="Motel Campo",
+                address="Route des Jeunes - Genève",
+                description="",
+                source_url="",
+            ),
+        ]
+    }
+    src = Source(
+        name="fakesrc",
+        scraper=_fake_events_factory(events_map),
+        kind="event",
+        method="html_scrape",
+        category_hint="soiree",
+        freshness="daily",
+        trust="community",
+        schedule="0 6 * * *",
+        homepage="https://fake.example",
+        crawl_delay_s=0,
+    )
+    monkeypatch.setattr(reg, "SOURCES", [src])
+
+    summary = runner.run_source("fakesrc", start=start, days=1, engine=engine)
+
+    assert summary.parsed == 3            # scraper found 3
+    assert summary.inserted == 1          # only the GE one landed
+    assert summary.skipped == 2           # St-Cergue + Ferney rejected
+
+    with engine.begin() as c:
+        rows = c.execute(text("SELECT title FROM events")).all()
+    assert [r[0] for r in rows] == ["Genève soirée"]
+
+    with engine.begin() as c:
+        scrape = c.execute(
+            text("SELECT parsed_count, inserted_count, skipped_count FROM scrape_runs")
+        ).one()
+    assert scrape == (3, 1, 2)
 
 
 def test_disabled_source_is_skipped(engine, fake_source):

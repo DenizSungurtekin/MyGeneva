@@ -220,6 +220,48 @@ DAG run `smoke3_2026_09_26` :
 ### Statut de la stack
 Docker Compose reste **allumé** (Postgres + Airflow web + scheduler + init exited). `docker compose down` pour tout couper. Volume `mygeneva_postgres_data` persistant.
 
+## Ajout — 2026-09-26 : catégorie par heure locale + filtre Genève-only
+
+Deux fixes ciblés au pipeline suite à des mauvais rendus dans l'app.
+
+### Catégorie déterminée par l'heure de début (Europe/Zurich), pas par le genre
+
+Avant, tout event du genre "fetes" de ladecadanse tombait en `soiree`. Une désalpe à 08h est arrivée sous soirée du samedi.
+
+Nouvelle règle dans `pipeline/mapping.py::resolve_category` :
+- `local_hour >= 17` **OU** `local_hour < 5` → `soiree`
+- Sinon → `journee`
+
+Deux plages fusionnées : "afterwork jusqu'au bout de la nuit" (17h → 24h) et "nuit qui a débordé après minuit" (00h → 05h). L'après-minuit couvre le cas d'un set techno listé à Sat 00:00 qui est en fait la continuation du vendredi soir.
+
+Le genre du source (`fetes`, `expos`, `concerts`…) n'entre plus en jeu — seul le start hour compte. Fallback sur `source.category_hint` si `date_start` est absent (rare).
+
+### Filtre Geneva-only à l'insertion
+
+Avant, la Désalpe de St-Cergue et le bal de Ferney-Voltaire s'affichaient dans MyGeneva alors que ce n'est pas Genève.
+
+Nouveau `pipeline/runner.py::_is_geneva` : garde uniquement les events dont l'adresse se termine par "Genève" (dernier segment du pattern `Rue – Commune – Canton/Pays` de ladecadanse). Couvre canton GE entier (Meyrin, Carouge, Plan-les-Ouates, Veyrier…), rejette Vaud, France et compagnie.
+
+Les events non-Genève sont **skipped à l'insertion** et comptés dans `scrape_runs.skipped_count` (colonne qui n'était pas peuplée avant). Nouveau champ `skipped` sur `RunSummary`, affiché par la CLI.
+
+Tradeoff assumé : perte du Grand Genève transfrontalier (Ferney, Annemasse…). Réversible via un futur `geneva_only: bool` sur `Source` — noté dans `suggestion.md`.
+
+### Validation
+
+- 32 tests verts (16 pipeline + 27 backend, dont 5 nouveaux tests mapping et 1 nouveau test runner).
+- Backfill live : Postgres purgé de ses 92 events puis rescrapé Sept 25 → Oct 2. Résultat : **83 events insérés (66 soirée + 17 journée), 9 skippés non-Genève**. Auparavant tous seraient soirées.
+- Cas edge validé : "TRAUMER B2B" à Sat 00:00 → correctement classé `soiree` maintenant (avant fix : journée).
+- Vérif SQL : `SELECT COUNT(*) FROM events WHERE source='ladecadanse' AND address NOT LIKE '%Genève'` → 0.
+
+### Fichiers touchés
+
+- `pipeline/mapping.py` (règle catégorie)
+- `pipeline/runner.py` (filtre + skipped_count)
+- `pipeline/run_source.py` (affichage skipped dans la CLI)
+- `pipeline/tests/test_mapping.py` (5 nouveaux tests)
+- `pipeline/tests/test_runner.py` (1 nouveau test, adresses corrigées dans les fixtures)
+- `suggestion.md` (note `geneva_only` per-source)
+
 ## Journal chronologique
 
 - **Init** : lecture des 4 fichiers de contexte, création `.gitignore`, `PROGRESS.md`, structure de repo, commit initial.

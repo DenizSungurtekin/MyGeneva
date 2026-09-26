@@ -29,8 +29,23 @@ class RunSummary:
     parsed: int
     inserted: int
     updated: int
+    skipped: int
     empty_days: int
     errors: list[str]
+
+
+# Address strings from ladecadanse follow the pattern
+#   "Street - Commune - Canton/Country"
+# The canton/country is always the last " - "-separated segment. An event whose
+# last segment is "Genève" (or a bare " - Genève" with no commune) is in canton
+# GE — covers Meyrin, Carouge, Plan-les-Ouates, etc. Anything else (Vaud, France,
+# etc.) gets filtered out.
+def _is_geneva(raw: EventRaw) -> bool:
+    address = (raw.address or "").strip()
+    if not address:
+        return False
+    last_segment = address.rsplit(" - ", 1)[-1].strip().lower()
+    return last_segment == "genève"
 
 
 def _utcnow() -> datetime:
@@ -132,6 +147,7 @@ def _log_run(
     parsed: int,
     inserted: int,
     updated: int,
+    skipped: int,
     status: str,
     error: Optional[str],
     started_at: datetime,
@@ -144,8 +160,8 @@ def _log_run(
                 "http_status, raw_html, parsed_count, inserted_count, "
                 "updated_count, skipped_count, status, error, started_at, "
                 "finished_at) VALUES (:source_name, :target_date, :url, 200, "
-                ":raw_html, :parsed, :inserted, :updated, 0, :status, :error, "
-                ":started_at, :finished_at)"
+                ":raw_html, :parsed, :inserted, :updated, :skipped, :status, "
+                ":error, :started_at, :finished_at)"
             ),
             {
                 "source_name": source_name,
@@ -155,6 +171,7 @@ def _log_run(
                 "parsed": parsed,
                 "inserted": inserted,
                 "updated": updated,
+                "skipped": skipped,
                 "status": status,
                 "error": error,
                 "started_at": started_at,
@@ -202,9 +219,9 @@ def run_source(
     _sync_source_row(engine, source)
     if not _is_enabled(engine, source_name):
         log.info("source %s disabled, skipping", source_name)
-        return RunSummary(source_name, days, 0, 0, 0, 0, [])
+        return RunSummary(source_name, days, 0, 0, 0, 0, 0, [])
 
-    parsed = inserted = updated = empty = 0
+    parsed = inserted = updated = skipped = empty = 0
     errors: list[str] = []
 
     for offset in range(days):
@@ -224,6 +241,7 @@ def run_source(
                 parsed=0,
                 inserted=0,
                 updated=0,
+                skipped=0,
                 status="failure",
                 error=msg,
                 started_at=started,
@@ -233,8 +251,11 @@ def run_source(
         if not events:
             empty += 1
 
-        day_inserted = day_updated = 0
+        day_inserted = day_updated = day_skipped = 0
         for raw in events:
+            if not _is_geneva(raw):
+                day_skipped += 1
+                continue
             outcome = _upsert_event(engine, source, raw)
             if outcome == "inserted":
                 day_inserted += 1
@@ -243,6 +264,7 @@ def run_source(
         parsed += len(events)
         inserted += day_inserted
         updated += day_updated
+        skipped += day_skipped
 
         _log_run(
             engine,
@@ -252,6 +274,7 @@ def run_source(
             parsed=len(events),
             inserted=day_inserted,
             updated=day_updated,
+            skipped=day_skipped,
             status="success",
             error=None,
             started_at=started,
@@ -261,7 +284,7 @@ def run_source(
     _mark_source_finished(
         engine,
         source_name,
-        records=parsed,
+        records=inserted + updated,   # records that actually landed in the DB
         error="; ".join(errors) if errors else None,
     )
 
@@ -271,6 +294,7 @@ def run_source(
         parsed=parsed,
         inserted=inserted,
         updated=updated,
+        skipped=skipped,
         empty_days=empty,
         errors=errors,
     )
