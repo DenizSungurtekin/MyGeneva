@@ -11,6 +11,10 @@ class EventRaw:
 
     `external_id` is required — it's the site's own stable identifier and
     the key we use for idempotent upserts (composite key with `source_name`).
+
+    `place_external_id` is the source's own venue identifier (e.g. `idL`
+    on ladecadanse). When set, the runner upserts a Place row keyed by
+    (source_name, place_external_id) and links the event via place_id.
     """
 
     source_name: str
@@ -24,4 +28,5 @@ class EventRaw:
     description: str = ""
     source_url: str = ""
     image_url: str = ""
+    place_external_id: Optional[str] = None
     extras: dict = field(default_factory=dict)

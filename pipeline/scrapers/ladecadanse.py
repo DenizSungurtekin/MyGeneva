@@ -110,6 +110,13 @@ def _parse_article(article: Tag, *, genre: str, fallback_date: date) -> Optional
 
     venue_link = article.select_one("header.titre span.right a")
     venue_name = _text(venue_link)
+    place_external_id: Optional[str] = None
+    if venue_link:
+        # href pattern: /lieu/lieu.php?idL=NNN — the stable venue id on ladecadanse.
+        href = venue_link.get("href", "")
+        m_place = re.search(r"idL=(\d+)", href)
+        if m_place:
+            place_external_id = m_place.group(1)
 
     address = _text(article.select_one("div.pratique span.left"))
     description = _text(article.select_one("div.event-media div.description p"))
@@ -153,6 +160,7 @@ def _parse_article(article: Tag, *, genre: str, fallback_date: date) -> Optional
         description=description,
         source_url=source_url,
         image_url=image_url,
+        place_external_id=place_external_id,
     )
 
 

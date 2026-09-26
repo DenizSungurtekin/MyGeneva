@@ -32,6 +32,14 @@ def test_parse_extracts_title_venue_address_and_source_url():
     assert e.genre == "fetes"
 
 
+def test_parse_extracts_place_external_id_from_venue_link():
+    html = FIXTURE.read_text(encoding="utf-8")
+    events = ladecadanse.parse_html(html, fallback_date=date(2026, 9, 26))
+    e = next(e for e in events if e.external_id == "999001")
+    assert e.venue_name == "Motel Campo"
+    assert e.place_external_id == "1"
+
+
 def test_gcal_dates_parsed_into_utc():
     """Local 23:00 Europe/Zurich in September (CEST = UTC+2) → 21:00 UTC."""
     html = FIXTURE.read_text(encoding="utf-8")

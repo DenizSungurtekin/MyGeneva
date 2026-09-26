@@ -111,9 +111,62 @@ def _is_enabled(engine: Engine, source_name: str) -> bool:
     return bool(row[0]) if row else True
 
 
+def _upsert_place(engine: Engine, raw: EventRaw) -> Optional[int]:
+    """Upsert the event's venue as a Place row and return its id.
+
+    Dedup key is (source, external_id). If the raw event doesn't carry a
+    place_external_id (source didn't expose a stable venue id), we don't
+    create a place — the event stays place_id=NULL.
+    """
+    if not raw.place_external_id or not raw.venue_name:
+        return None
+    now = _utcnow()
+    with engine.begin() as conn:
+        existing = conn.execute(
+            text(
+                "SELECT id FROM places WHERE source = :source AND external_id = :ext"
+            ),
+            {"source": raw.source_name, "ext": raw.place_external_id},
+        ).first()
+        if existing is not None:
+            # Refresh name + address if they've drifted (keep image_url as-is —
+            # that's the curated field the user may have manually set).
+            conn.execute(
+                text(
+                    "UPDATE places SET name=:name, address=:address, "
+                    "updated_at=:now WHERE id=:id"
+                ),
+                {
+                    "name": raw.venue_name,
+                    "address": raw.address or "",
+                    "now": now,
+                    "id": existing[0],
+                },
+            )
+            return int(existing[0])
+        result = conn.execute(
+            text(
+                "INSERT INTO places (name, address, description, source, "
+                "external_id, created_at, updated_at) VALUES "
+                "(:name, :address, '', :source, :external_id, :now, :now) "
+                "RETURNING id"
+            ),
+            {
+                "name": raw.venue_name,
+                "address": raw.address or "",
+                "source": raw.source_name,
+                "external_id": raw.place_external_id,
+                "now": now,
+            },
+        )
+        return int(result.scalar_one())
+
+
 def _upsert_event(engine: Engine, source: Source, raw: EventRaw) -> str:
     """Return 'inserted' or 'updated'."""
     kwargs = to_event_kwargs(raw, source)
+    place_id = _upsert_place(engine, raw)
+    kwargs["place_id"] = place_id
     now = _utcnow()
     with engine.begin() as conn:
         existing = conn.execute(
@@ -128,12 +181,12 @@ def _upsert_event(engine: Engine, source: Source, raw: EventRaw) -> str:
                 text(
                     "INSERT INTO events (title, description, category, "
                     "location_name, address, date_start, date_end, image_url, "
-                    "source, source_url, external_id, is_verified, "
+                    "source, source_url, external_id, place_id, is_verified, "
                     "created_at, updated_at) "
                     "VALUES (:title, :description, :category, :location_name, "
                     ":address, :date_start, :date_end, :image_url, :source, "
-                    ":source_url, :external_id, :is_verified, :created_at, "
-                    ":updated_at)"
+                    ":source_url, :external_id, :place_id, :is_verified, "
+                    ":created_at, :updated_at)"
                 ),
                 {**kwargs, "created_at": now, "updated_at": now},
             )
@@ -143,8 +196,8 @@ def _upsert_event(engine: Engine, source: Source, raw: EventRaw) -> str:
                 "UPDATE events SET title=:title, description=:description, "
                 "category=:category, location_name=:location_name, "
                 "address=:address, date_start=:date_start, date_end=:date_end, "
-                "image_url=:image_url, source_url=:source_url, updated_at=:updated_at "
-                "WHERE id=:id"
+                "image_url=:image_url, source_url=:source_url, place_id=:place_id, "
+                "updated_at=:updated_at WHERE id=:id"
             ),
             {**kwargs, "id": existing[0], "updated_at": now},
         )
