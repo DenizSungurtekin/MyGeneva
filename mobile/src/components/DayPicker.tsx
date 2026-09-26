@@ -13,7 +13,7 @@ interface Props {
 
 const PILL_WIDTH = 60;
 
-export function DayPicker({ value, onChange, before = 3, after = 14 }: Props) {
+export function DayPicker({ value, onChange, before = 3, after = 7 }: Props) {
   const { theme } = useTheme();
   const today = useMemo(() => {
     const d = new Date();

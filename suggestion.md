@@ -202,6 +202,24 @@ Réutiliser `_apply_day_filter` (le même que `/events`) pour la fenêtre tempor
 
 ---
 
+## Date-picker calendrier (bouton "Voir plus loin")
+
+**Statut** : planifié (2026-09-26).
+**Contexte** : le `DayPicker` affiche J-3 → J+7 en pastilles horizontales. Suffit pour l'usage quotidien "quoi ce soir / ce week-end". Mais un utilisateur qui prévoit une sortie 3 semaines à l'avance n'a pas de porte d'entrée.
+
+**Ce qu'il faut faire** :
+- Ajouter à droite du strip de dates un dernier bouton "**Choisir une date**" (icône `calendar`) qui ouvre un vrai date-picker natif.
+- iOS/Android : `@react-native-community/datetimepicker` (le package standard). Sur Expo, disponible via `expo install`.
+- Web : `<input type="date">` HTML natif fait le job — pas besoin de polyfill.
+- Une fois la date choisie, l'app :
+  1. met à jour `selectedDay` dans le context (comportement identique aux pastilles),
+  2. Optionnellement re-recentre le `DayPicker` sur la nouvelle date en élargissant la fenêtre ad hoc, ou simplement affiche "Le 12 novembre 2026" en gros au-dessus des events (et la timeline pastilles reste sur J-3/J+7 pour usage rapide).
+- Question à trancher au moment de l'implémenter : est-ce qu'on doit scraper à la demande quand une date lointaine est choisie (event 3 semaines dans le futur pas encore scrapé) ? Ma reco pour le MVP : non. On limite le choix aux dates déjà scrapées (fenêtre du DAG). Le message "Aucun événement pour cette date" est acceptable.
+
+**Effort estimé** : ~2 h (composant, wiring context, tests).
+
+---
+
 ## Autres pistes évoquées en session, à formaliser plus tard
 
 - **Purge `scrape_runs.raw_html`** : la colonne est prête mais non peuplée (le scraper n'y envoie rien pour l'instant). Si on l'active, prévoir un job Airflow qui garde les N dernières runs par source, sinon la table grossit d'~1 MB/jour.
