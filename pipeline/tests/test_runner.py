@@ -211,6 +211,60 @@ def test_non_geneva_events_are_skipped(engine, monkeypatch):
     assert scrape == (3, 1, 2)
 
 
+def test_corrupted_dates_are_skipped(engine, monkeypatch):
+    """Events whose date_end precedes date_start are rejected outright."""
+    start = date(2026, 9, 26)
+    events_map = {
+        start: [
+            EventRaw(
+                source_name="fakesrc",
+                external_id="broken",
+                title="Vice Party (bad dates)",
+                date_start=datetime(2026, 9, 26, 21, 0, tzinfo=timezone.utc),
+                date_end=datetime(2026, 9, 26, 6, 0, tzinfo=timezone.utc),   # 15h AVANT
+                genre="fetes",
+                venue_name="",
+                address="Halle W - Vernier - Genève",
+                description="",
+                source_url="",
+            ),
+            EventRaw(
+                source_name="fakesrc",
+                external_id="ok",
+                title="Fine event",
+                date_start=datetime(2026, 9, 26, 20, 0, tzinfo=timezone.utc),
+                date_end=datetime(2026, 9, 26, 22, 0, tzinfo=timezone.utc),
+                genre="fetes",
+                venue_name="",
+                address="Rue - Genève",
+                description="",
+                source_url="",
+            ),
+        ]
+    }
+    src = Source(
+        name="fakesrc",
+        scraper=_fake_events_factory(events_map),
+        kind="event",
+        method="html_scrape",
+        category_hint="soiree",
+        freshness="daily",
+        trust="community",
+        schedule="0 6 * * *",
+        homepage="https://fake.example",
+        crawl_delay_s=0,
+    )
+    monkeypatch.setattr(reg, "SOURCES", [src])
+
+    summary = runner.run_source("fakesrc", start=start, days=1, engine=engine)
+    assert summary.parsed == 2
+    assert summary.inserted == 1
+    assert summary.skipped == 1
+    with engine.begin() as c:
+        rows = c.execute(text("SELECT external_id FROM events")).all()
+    assert [r[0] for r in rows] == ["ok"]
+
+
 def test_disabled_source_is_skipped(engine, fake_source):
     _src, start = fake_source
     # First run creates the sources row.

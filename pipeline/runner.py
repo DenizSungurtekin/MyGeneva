@@ -48,6 +48,19 @@ def _is_geneva(raw: EventRaw) -> bool:
     return last_segment == "genève"
 
 
+def _has_valid_dates(raw: EventRaw) -> bool:
+    """Reject events whose end is before their start.
+
+    Some source entries have a buggy Google Calendar link where the day of
+    date_end wasn't incremented (e.g. `20260926T230000/20260926T080000` for a
+    party that actually ends Sunday morning). We can't heuristically fix these
+    from the description without breaking on edge cases, so we drop them.
+    """
+    if raw.date_end is None:
+        return True
+    return raw.date_end > raw.date_start
+
+
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -253,6 +266,13 @@ def run_source(
 
         day_inserted = day_updated = day_skipped = 0
         for raw in events:
+            if not _has_valid_dates(raw):
+                log.info(
+                    "skip corrupted dates for %s/%s: %s → %s",
+                    raw.source_name, raw.external_id, raw.date_start, raw.date_end,
+                )
+                day_skipped += 1
+                continue
             if not _is_geneva(raw):
                 day_skipped += 1
                 continue

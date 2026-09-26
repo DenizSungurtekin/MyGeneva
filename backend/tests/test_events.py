@@ -77,6 +77,84 @@ def test_list_events_date_overlap_journee(client):
     assert titles == ["Overlap"]
 
 
+def test_journee_reaching_evening_appears_in_soiree_list(client):
+    """A 'party' starting at 15h and ending at 22h should show under BOTH days."""
+    start = datetime(2026, 3, 5, 13, 0, tzinfo=timezone.utc)   # 14h CET = 15h in Zurich once DST
+    end = datetime(2026, 3, 5, 21, 0, tzinfo=timezone.utc)     # 22h CET
+    client.post(
+        "/events",
+        json=_event_payload(
+            title="Long Party",
+            category="journee",
+            date_start=start.isoformat(),
+            date_end=end.isoformat(),
+        ),
+    )
+
+    j = client.get("/events", params={"date": "2026-03-05", "category": "journee"}).json()
+    assert [e["title"] for e in j] == ["Long Party"]
+
+    s = client.get("/events", params={"date": "2026-03-05", "category": "soiree"}).json()
+    assert [e["title"] for e in s] == ["Long Party"]
+
+
+def test_journee_short_daytime_not_in_soiree_list(client):
+    """A workshop 10h-14h stays journée only — no bleed into soirée."""
+    start = datetime(2026, 3, 5, 9, 0, tzinfo=timezone.utc)    # 10h CET
+    end = datetime(2026, 3, 5, 13, 0, tzinfo=timezone.utc)     # 14h CET
+    client.post(
+        "/events",
+        json=_event_payload(
+            title="Workshop",
+            category="journee",
+            date_start=start.isoformat(),
+            date_end=end.isoformat(),
+        ),
+    )
+    assert client.get("/events", params={"date": "2026-03-05", "category": "soiree"}).json() == []
+
+
+def test_multi_day_journee_shows_on_next_day_only_if_past_8h(client):
+    """A journée event that runs Sat 10h → Sun 03h should NOT appear on Sunday.
+
+    Rationale: 03h Sunday is really the tail of Saturday's session. If the same
+    fête has a proper Sunday listing, it belongs there, not here.
+    """
+    start = datetime(2026, 3, 7, 9, 0, tzinfo=timezone.utc)    # Sat 10h CET
+    end = datetime(2026, 3, 8, 2, 0, tzinfo=timezone.utc)      # Sun 03h CET
+    client.post(
+        "/events",
+        json=_event_payload(
+            title="LateJournee",
+            category="journee",
+            date_start=start.isoformat(),
+            date_end=end.isoformat(),
+        ),
+    )
+    on_sat = client.get("/events", params={"date": "2026-03-07", "category": "journee"}).json()
+    assert [e["title"] for e in on_sat] == ["LateJournee"]
+
+    on_sun = client.get("/events", params={"date": "2026-03-08", "category": "journee"}).json()
+    assert on_sun == []
+
+
+def test_multi_day_journee_shows_on_next_day_if_past_8h(client):
+    """A journée event Sat 10h → Sun 12h (marché long) DOES appear on Sunday."""
+    start = datetime(2026, 3, 7, 9, 0, tzinfo=timezone.utc)    # Sat 10h CET
+    end = datetime(2026, 3, 8, 11, 0, tzinfo=timezone.utc)     # Sun 12h CET
+    client.post(
+        "/events",
+        json=_event_payload(
+            title="LongMarket",
+            category="journee",
+            date_start=start.isoformat(),
+            date_end=end.isoformat(),
+        ),
+    )
+    on_sun = client.get("/events", params={"date": "2026-03-08", "category": "journee"}).json()
+    assert [e["title"] for e in on_sun] == ["LongMarket"]
+
+
 def test_list_events_soiree_stays_on_start_day(client):
     """A Fri-night party ending Sat morning belongs to Friday, not Saturday."""
     start = datetime(2026, 3, 5, 21, 0, tzinfo=timezone.utc)   # Thu 21h UTC = Fri 22h CET
