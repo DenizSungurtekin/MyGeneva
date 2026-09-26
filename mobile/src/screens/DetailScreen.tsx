@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 
 import { EventImage } from '../components/EventImage';
+import { EventMap } from '../components/EventMap';
 import { FavoriteHeart } from '../components/FavoriteHeart';
 import { Tag } from '../components/Tag';
 import { eventsApi } from '../api/events';
@@ -211,7 +212,11 @@ export function DetailScreen() {
             </View>
             <Text style={styles.description}>{event.description || 'Pas de description.'}</Text>
             <Section title="Adresse" body={event.address || 'Non renseignée'} />
-            <MapPlaceholder />
+            <EventMap
+              address={event.address || event.location_name || 'Genève'}
+              latitude={event.latitude}
+              longitude={event.longitude}
+            />
           </View>
         ) : restaurant ? (
           <View style={styles.body}>
@@ -239,7 +244,11 @@ export function DetailScreen() {
               {restaurant.description || 'Pas de description.'}
             </Text>
             <Section title="Adresse" body={restaurant.address || 'Non renseignée'} />
-            <MapPlaceholder />
+            <EventMap
+              address={restaurant.address || restaurant.location_name || 'Genève'}
+              latitude={restaurant.latitude}
+              longitude={restaurant.longitude}
+            />
           </View>
         ) : null}
       </ScrollView>
@@ -272,28 +281,3 @@ function Section({ title, body }: { title: string; body: string }) {
   );
 }
 
-function MapPlaceholder() {
-  const { theme } = useTheme();
-  const styles = useMemo(
-    () =>
-      StyleSheet.create({
-        map: {
-          marginTop: spacing.md,
-          height: 120,
-          backgroundColor: theme.colors.lieuCard,
-          borderColor: theme.colors.border,
-          borderWidth: 1,
-          borderRadius: radius.card,
-          alignItems: 'center',
-          justifyContent: 'center',
-        },
-      }),
-    [theme],
-  );
-  return (
-    <View style={styles.map}>
-      <Feather name="map" size={28} color={theme.colors.textMuted} />
-      <Text style={[theme.text.meta, { marginTop: spacing.xxs }]}>Carte à venir</Text>
-    </View>
-  );
-}
