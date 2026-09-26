@@ -40,6 +40,14 @@ class Event(SQLModel, table=True):
     place_id: Optional[int] = Field(default=None, foreign_key="places.id", index=True)
     is_verified: bool = Field(default=False)
     is_promoted: bool = Field(default=False, index=True)
+    # Deterministic hash across sources — used to detect that two scrapers
+    # picked up the same real-world event. Populated by the runner from
+    # (normalized_title, local_date, place_signature). Indexed for fast lookup.
+    dedup_key: Optional[str] = Field(default=None, index=True)
+    # JSON array of alternate source URLs discovered by later scrapers that
+    # matched this event's dedup_key. Persisted as text on SQLite / jsonb on
+    # Postgres via SQLModel's default JSON handling.
+    alt_source_urls: Optional[str] = None
 
     created_at: datetime = Field(default_factory=_utcnow, nullable=False)
     updated_at: datetime = Field(default_factory=_utcnow, nullable=False)

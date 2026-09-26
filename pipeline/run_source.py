@@ -22,14 +22,24 @@ def main() -> int:
     parser.add_argument(
         "--start",
         type=date.fromisoformat,
-        default=date.today(),
-        help="First day to scrape (YYYY-MM-DD). Defaults to today.",
+        default=None,
+        help="First day to scrape (YYYY-MM-DD). Defaults to today − --lookback.",
     )
     parser.add_argument(
         "--days",
         type=int,
         default=7,
-        help="How many consecutive days to scrape (default 7).",
+        help="How many consecutive days from --start (default 7).",
+    )
+    parser.add_argument(
+        "--lookback",
+        type=int,
+        default=0,
+        help=(
+            "Number of days BEFORE today to also load. Shifts --start earlier "
+            "and extends --days by the same amount. Ex: --lookback 3 --days 7 "
+            "with default start = J−3 → J+7 (11 days total)."
+        ),
     )
     parser.add_argument(
         "--verbose", "-v", action="store_true", help="Enable debug logging."
@@ -41,12 +51,15 @@ def main() -> int:
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
 
-    summary = run_source(args.source, start=args.start, days=args.days)
+    from datetime import timedelta as _td
+    start = args.start if args.start is not None else date.today() - _td(days=args.lookback)
+    total_days = args.days + (args.lookback if args.start is None else 0)
+    summary = run_source(args.source, start=start, days=total_days)
     print(
-        f"[{summary.source_name}] {summary.days} day(s) from {args.start}: "
+        f"[{summary.source_name}] {summary.days} day(s) from {start}: "
         f"parsed={summary.parsed} inserted={summary.inserted} "
-        f"updated={summary.updated} skipped={summary.skipped} "
-        f"empty_days={summary.empty_days}"
+        f"updated={summary.updated} merged={summary.merged} "
+        f"skipped={summary.skipped} empty_days={summary.empty_days}"
     )
     if summary.errors:
         print("Errors:")

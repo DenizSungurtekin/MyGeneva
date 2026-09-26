@@ -61,5 +61,7 @@ class EventRead(BaseModel):
     place_id: Optional[int] = None
     is_verified: bool
     is_promoted: bool = False
+    dedup_key: Optional[str] = None
+    alt_source_urls: Optional[str] = None
     created_at: datetime
     updated_at: datetime

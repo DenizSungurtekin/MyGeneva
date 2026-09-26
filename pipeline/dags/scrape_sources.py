@@ -25,12 +25,15 @@ if str(REPO_ROOT) not in sys.path:
 
 
 DEFAULT_DAYS = int(os.environ.get("MYGENEVA_SCRAPE_DAYS", "7"))
+DEFAULT_LOOKBACK = int(os.environ.get("MYGENEVA_SCRAPE_LOOKBACK", "0"))
 
 
 def _scrape(source_name: str, **_) -> dict:
     from pipeline.runner import run_source
 
-    summary = run_source(source_name, start=date.today(), days=DEFAULT_DAYS)
+    start = date.today() - timedelta(days=DEFAULT_LOOKBACK)
+    total_days = DEFAULT_DAYS + DEFAULT_LOOKBACK
+    summary = run_source(source_name, start=start, days=total_days)
     return {
         "source": summary.source_name,
         "parsed": summary.parsed,

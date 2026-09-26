@@ -265,6 +265,77 @@ def test_corrupted_dates_are_skipped(engine, monkeypatch):
     assert [r[0] for r in rows] == ["ok"]
 
 
+def test_dedup_across_sources_merges_second(engine, monkeypatch):
+    """Two sources describing the same event → one row, second URL kept as alt."""
+    start = date(2026, 9, 26)
+    same_start = datetime(2026, 9, 26, 22, 0, tzinfo=timezone.utc)
+    src1_event = EventRaw(
+        source_name="src1",
+        external_id="ext1",
+        title="Nuit Techno",
+        date_start=same_start,
+        date_end=None,
+        genre="fetes",
+        venue_name="Motel Campo",
+        address="Rue X - Genève",
+        description="",
+        source_url="https://source1.example/event/1",
+    )
+    src2_event = EventRaw(
+        source_name="src2",
+        external_id="ext2",
+        title="Nuit Techno",  # same title
+        date_start=same_start,  # same date
+        date_end=None,
+        genre="fetes",
+        venue_name="Motel Campo",  # same venue (no place_id, falls back to venue_name)
+        address="Rue X - Genève",
+        description="",
+        source_url="https://source2.example/event/xyz",
+    )
+    src1 = Source(
+        name="src1",
+        scraper=_fake_events_factory({start: [src1_event]}),
+        kind="event",
+        method="html_scrape",
+        category_hint="soiree",
+        freshness="daily",
+        trust="community",
+        schedule="0 6 * * *",
+        homepage="https://source1.example",
+        crawl_delay_s=0,
+    )
+    src2 = Source(
+        name="src2",
+        scraper=_fake_events_factory({start: [src2_event]}),
+        kind="event",
+        method="html_scrape",
+        category_hint="soiree",
+        freshness="daily",
+        trust="community",
+        schedule="0 6 * * *",
+        homepage="https://source2.example",
+        crawl_delay_s=0,
+    )
+    monkeypatch.setattr(reg, "SOURCES", [src1, src2])
+
+    s1 = runner.run_source("src1", start=start, days=1, engine=engine)
+    s2 = runner.run_source("src2", start=start, days=1, engine=engine)
+
+    assert s1.inserted == 1
+    assert s2.inserted == 0        # not inserted — dedup hit
+    assert s2.merged == 1          # counted as merged
+    with engine.begin() as c:
+        rows = c.execute(
+            text("SELECT source, source_url, alt_source_urls FROM events")
+        ).all()
+    assert len(rows) == 1
+    row = rows[0]
+    assert row[0] == "src1"                        # primary source untouched
+    assert row[1] == "https://source1.example/event/1"
+    assert "https://source2.example/event/xyz" in (row[2] or "")
+
+
 def test_disabled_source_is_skipped(engine, fake_source):
     _src, start = fake_source
     # First run creates the sources row.

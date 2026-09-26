@@ -15,6 +15,7 @@ from sqlalchemy import text
 from sqlalchemy.engine import Engine
 
 from pipeline.db import make_engine
+from pipeline.dedup import compute_dedup_key
 from pipeline.mapping import to_event_kwargs
 from pipeline.models import EventRaw
 from pipeline.sources.registry import Source, by_name
@@ -29,23 +30,27 @@ class RunSummary:
     parsed: int
     inserted: int
     updated: int
+    merged: int          # cross-source dedup hits (this source's row matched an existing one)
     skipped: int
     empty_days: int
     errors: list[str]
 
 
-# Address strings from ladecadanse follow the pattern
-#   "Street - Commune - Canton/Country"
-# The canton/country is always the last " - "-separated segment. An event whose
-# last segment is "Genève" (or a bare " - Genève" with no commune) is in canton
-# GE — covers Meyrin, Carouge, Plan-les-Ouates, etc. Anything else (Vaud, France,
-# etc.) gets filtered out.
+# Address strings from different sources use different separators:
+#   ladecadanse   → "Street - Commune - Canton/Country"   (` - ` between segments)
+#   villagedusoir → "Commune, Canton"                     (`, ` between segments)
+# In both cases the canton is the LAST segment. Split by either separator and
+# check the tail against "Genève" (case-insensitive, no accents). Non-GE
+# addresses (Vaud, Ferney-Voltaire/France, etc.) drop out.
 def _is_geneva(raw: EventRaw) -> bool:
     address = (raw.address or "").strip()
     if not address:
         return False
-    last_segment = address.rsplit(" - ", 1)[-1].strip().lower()
-    return last_segment == "genève"
+    # Peel back " - " first, then ", " on whatever remains — either or both
+    # can be present.
+    tail = address.rsplit(" - ", 1)[-1]
+    tail = tail.rsplit(", ", 1)[-1]
+    return tail.strip().lower() == "genève"
 
 
 def _has_valid_dates(raw: EventRaw) -> bool:
@@ -162,13 +167,39 @@ def _upsert_place(engine: Engine, raw: EventRaw) -> Optional[int]:
         return int(result.scalar_one())
 
 
+def _append_alt_source_url(current: Optional[str], url: str) -> str:
+    """Return an updated JSON array string with `url` appended (deduplicated)."""
+    import json as _json
+
+    if not current:
+        urls: list = []
+    else:
+        try:
+            urls = _json.loads(current) if isinstance(current, str) else list(current)
+            if not isinstance(urls, list):
+                urls = []
+        except Exception:  # noqa: BLE001
+            urls = []
+    if url and url not in urls:
+        urls.append(url)
+    return _json.dumps(urls, ensure_ascii=False)
+
+
 def _upsert_event(engine: Engine, source: Source, raw: EventRaw) -> str:
-    """Return 'inserted' or 'updated'."""
+    """Return 'inserted', 'updated', or 'merged' (cross-source dedup hit)."""
     kwargs = to_event_kwargs(raw, source)
     place_id = _upsert_place(engine, raw)
     kwargs["place_id"] = place_id
+    dedup_key = compute_dedup_key(
+        raw.title,
+        raw.date_start,
+        place_id=place_id,
+        venue_name=raw.venue_name,
+    )
+    kwargs["dedup_key"] = dedup_key
     now = _utcnow()
     with engine.begin() as conn:
+        # First, look up by our natural key (same source's rerun).
         existing = conn.execute(
             text(
                 "SELECT id FROM events WHERE source = :source "
@@ -176,32 +207,59 @@ def _upsert_event(engine: Engine, source: Source, raw: EventRaw) -> str:
             ),
             {"source": raw.source_name, "external_id": raw.external_id},
         ).first()
-        if existing is None:
+        if existing is not None:
             conn.execute(
                 text(
-                    "INSERT INTO events (title, description, category, "
-                    "location_name, address, date_start, date_end, image_url, "
-                    "source, source_url, external_id, place_id, is_verified, "
-                    "is_promoted, created_at, updated_at) "
-                    "VALUES (:title, :description, :category, :location_name, "
-                    ":address, :date_start, :date_end, :image_url, :source, "
-                    ":source_url, :external_id, :place_id, :is_verified, "
-                    "FALSE, :created_at, :updated_at)"
+                    "UPDATE events SET title=:title, description=:description, "
+                    "category=:category, location_name=:location_name, "
+                    "address=:address, date_start=:date_start, "
+                    "date_end=:date_end, image_url=:image_url, "
+                    "source_url=:source_url, place_id=:place_id, "
+                    "dedup_key=:dedup_key, updated_at=:updated_at WHERE id=:id"
                 ),
-                {**kwargs, "created_at": now, "updated_at": now},
+                {**kwargs, "id": existing[0], "updated_at": now},
             )
-            return "inserted"
+            return "updated"
+        # No existing row from THIS source — check if ANOTHER source already
+        # inserted the same real-world event (same dedup_key).
+        cross = conn.execute(
+            text(
+                "SELECT id, alt_source_urls FROM events "
+                "WHERE dedup_key = :dedup_key AND source != :source LIMIT 1"
+            ),
+            {"dedup_key": dedup_key, "source": raw.source_name},
+        ).first()
+        if cross is not None:
+            # Merge: append our source URL as an alternate; do not create a
+            # duplicate row. The primary source's title/desc/image win.
+            new_alt = _append_alt_source_url(cross[1], raw.source_url or "")
+            conn.execute(
+                text(
+                    "UPDATE events SET alt_source_urls=:alt, updated_at=:now "
+                    "WHERE id=:id"
+                ),
+                {"alt": new_alt, "now": now, "id": cross[0]},
+            )
+            log.info(
+                "dedup: merged %s/%s into event id=%s (primary source)",
+                raw.source_name, raw.external_id, cross[0],
+            )
+            return "merged"
+        # Fresh insert.
         conn.execute(
             text(
-                "UPDATE events SET title=:title, description=:description, "
-                "category=:category, location_name=:location_name, "
-                "address=:address, date_start=:date_start, date_end=:date_end, "
-                "image_url=:image_url, source_url=:source_url, place_id=:place_id, "
-                "updated_at=:updated_at WHERE id=:id"
+                "INSERT INTO events (title, description, category, "
+                "location_name, address, date_start, date_end, image_url, "
+                "source, source_url, external_id, place_id, is_verified, "
+                "is_promoted, dedup_key, created_at, updated_at) "
+                "VALUES (:title, :description, :category, :location_name, "
+                ":address, :date_start, :date_end, :image_url, :source, "
+                ":source_url, :external_id, :place_id, :is_verified, "
+                "FALSE, :dedup_key, :created_at, :updated_at)"
             ),
-            {**kwargs, "id": existing[0], "updated_at": now},
+            {**kwargs, "created_at": now, "updated_at": now},
         )
-        return "updated"
+        return "inserted"
 
 
 def _log_run(
@@ -285,9 +343,9 @@ def run_source(
     _sync_source_row(engine, source)
     if not _is_enabled(engine, source_name):
         log.info("source %s disabled, skipping", source_name)
-        return RunSummary(source_name, days, 0, 0, 0, 0, 0, [])
+        return RunSummary(source_name, days, 0, 0, 0, 0, 0, 0, [])
 
-    parsed = inserted = updated = skipped = empty = 0
+    parsed = inserted = updated = merged = skipped = empty = 0
     errors: list[str] = []
 
     for offset in range(days):
@@ -317,7 +375,7 @@ def run_source(
         if not events:
             empty += 1
 
-        day_inserted = day_updated = day_skipped = 0
+        day_inserted = day_updated = day_merged = day_skipped = 0
         for raw in events:
             if not _has_valid_dates(raw):
                 log.info(
@@ -332,11 +390,14 @@ def run_source(
             outcome = _upsert_event(engine, source, raw)
             if outcome == "inserted":
                 day_inserted += 1
+            elif outcome == "merged":
+                day_merged += 1
             else:
                 day_updated += 1
         parsed += len(events)
         inserted += day_inserted
         updated += day_updated
+        merged += day_merged
         skipped += day_skipped
 
         _log_run(
@@ -367,6 +428,7 @@ def run_source(
         parsed=parsed,
         inserted=inserted,
         updated=updated,
+        merged=merged,
         skipped=skipped,
         empty_days=empty,
         errors=errors,

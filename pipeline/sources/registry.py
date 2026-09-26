@@ -12,7 +12,7 @@ from datetime import date
 from typing import Callable, Literal
 
 from pipeline.models import EventRaw
-from pipeline.scrapers import ladecadanse
+from pipeline.scrapers import ladecadanse, villagedusoir
 
 
 ScraperFn = Callable[[date], list[EventRaw]]
@@ -55,6 +55,26 @@ SOURCES: list[Source] = [
             "Genre 'Fêtes' uniquement. Fenêtre par défaut J → J+7. "
             "robots.txt bloque les crawlers IA nommément mais pas les aggrégateurs "
             "user-agent identifiés — voir PROGRESS.md pour l'analyse juridique."
+        ),
+    ),
+    Source(
+        name="villagedusoir",
+        scraper=villagedusoir.fetch,
+        kind="event",
+        method="html_scrape",
+        category_hint="soiree",
+        freshness="daily",
+        trust="community",
+        schedule="0 6 * * *",
+        homepage="https://www.villagedusoir.com/",
+        crawl_delay_s=5,
+        notes=(
+            "Site sur Odoo, expose schema.org Event microdata. Un seul GET renvoie "
+            "toute la liste des events upcoming — le scraper cache le résultat au "
+            "niveau module pour éviter des HTTP calls répétés lors du loop per-day "
+            "du runner. Pas de venue_name côté source (seulement Commune, Canton) → "
+            "pas de matching place_id, dedup avec ladecadanse basé sur "
+            "(title, local_date, venue_name normalisé)."
         ),
     ),
 ]
