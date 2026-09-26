@@ -1,7 +1,8 @@
-import { Feather } from '@expo/vector-icons';
+import { Feather, Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -254,7 +255,22 @@ export function DetailScreen() {
       </ScrollView>
 
       <View style={styles.footer}>
-        <Pressable style={[styles.button, styles.buttonSecondary]} accessibilityRole="button">
+        <Pressable
+          style={[styles.button, styles.buttonSecondary]}
+          onPress={() => {
+            const item = detail.type === 'event' ? event : restaurant;
+            if (!item) return;
+            const target =
+              item.latitude != null && item.longitude != null
+                ? `${item.latitude},${item.longitude}`
+                : (item.address || item.location_name || 'Genève');
+            Linking.openURL(
+              `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(target)}`,
+            ).catch(() => undefined);
+          }}
+          accessibilityRole="button"
+          accessibilityLabel="Ouvrir l'itinéraire vers ce lieu"
+        >
           <Feather name="navigation" size={16} color={theme.colors.text} />
           <Text style={[theme.text.button, { color: theme.colors.text }]}>Itinéraire</Text>
         </Pressable>
@@ -263,7 +279,11 @@ export function DetailScreen() {
           onPress={() => toggleFavorite(detail.type, detail.id)}
           accessibilityRole="button"
         >
-          <Feather name="heart" size={16} color={theme.colors.ctaText} />
+          <Ionicons
+            name={favorite ? 'heart' : 'heart-outline'}
+            size={18}
+            color={theme.colors.ctaText}
+          />
           <Text style={theme.text.button}>Favoris</Text>
         </Pressable>
       </View>

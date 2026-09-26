@@ -1,4 +1,4 @@
-import { Feather } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import { Pressable, StyleSheet, ViewStyle } from 'react-native';
 
@@ -44,8 +44,8 @@ export function FavoriteHeart({ active, onPress, size = 'md', variant = 'card', 
       accessibilityLabel={active ? 'Retirer des favoris' : 'Ajouter aux favoris'}
       hitSlop={8}
     >
-      <Feather
-        name="heart"
+      <Ionicons
+        name={active ? 'heart' : 'heart-outline'}
         size={iconSize}
         color={active ? theme.colors.favoriteHeart : theme.colors.text}
       />
