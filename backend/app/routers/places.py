@@ -5,11 +5,12 @@ from typing import List, Optional
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import desc, func
+from sqlalchemy import and_, desc, func
 from sqlmodel import Session, select
 
 from app.database import get_session
 from app.models.event import Event
+from app.models.favorite import Favorite, FavoriteItemType
 from app.models.place import Place
 from app.schemas.event import EventRead
 from app.schemas.place import PlaceCreate, PlaceRead, PlaceUpdate
@@ -19,6 +20,7 @@ router = APIRouter(prefix="/places", tags=["places"])
 
 LOCAL_TZ = ZoneInfo("Europe/Zurich")
 ACTIVITY_WINDOW_DAYS = 30
+SEARCH_MIN_CHARS = 3
 
 
 def _utcnow() -> datetime:
@@ -26,26 +28,33 @@ def _utcnow() -> datetime:
 
 
 @router.get("", response_model=List[PlaceRead])
-def list_places(session: Session = Depends(get_session)) -> List[Place]:
-    """List places, ordered by number of upcoming events (next 30 days).
+def list_places(
+    search: Optional[str] = Query(default=None, min_length=0, max_length=200),
+    session: Session = Depends(get_session),
+) -> List[Place]:
+    """List places, ordered by overall popularity (favorites count desc),
+    alphabetical name as tiebreak. Accepts a `search` keyword (ILIKE on name).
 
-    Ties broken alphabetically by name. Places with zero upcoming events
-    fall to the bottom of the list.
+    Client-side reordering can float the current user's own favorites to the
+    top on top of this baseline. We keep that layer in the mobile app so the
+    endpoint stays user-agnostic (no auth needed).
     """
-    now = _utcnow()
-    horizon = now + timedelta(days=ACTIVITY_WINDOW_DAYS)
-    upcoming_count = func.count(Event.id).label("upcoming_count")
+    fav_count = func.count(Favorite.id).label("fav_count")
     query = (
-        select(Place, upcoming_count)
+        select(Place, fav_count)
         .outerjoin(
-            Event,
-            (Event.place_id == Place.id)
-            & (Event.date_start >= now)
-            & (Event.date_start < horizon),
+            Favorite,
+            and_(
+                Favorite.item_type == FavoriteItemType.place,
+                Favorite.item_id == Place.id,
+            ),
         )
         .group_by(Place.id)
-        .order_by(desc(upcoming_count), Place.name.asc())
+        .order_by(desc(fav_count), Place.name.asc())
     )
+    if search is not None and len(search.strip()) >= SEARCH_MIN_CHARS:
+        pattern = f"%{search.strip()}%"
+        query = query.where(Place.name.ilike(pattern) | Place.address.ilike(pattern))
     rows = session.exec(query).all()
     return [row[0] for row in rows]
 

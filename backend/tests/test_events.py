@@ -79,10 +79,15 @@ def test_list_events_date_overlap_journee(client):
     assert titles == ["Overlap"]
 
 
-def test_journee_reaching_evening_appears_in_soiree_list(client):
-    """A 'party' starting at 15h and ending at 22h should show under BOTH days."""
-    start = datetime(2026, 3, 5, 13, 0, tzinfo=timezone.utc)   # 14h CET = 15h in Zurich once DST
-    end = datetime(2026, 3, 5, 21, 0, tzinfo=timezone.utc)     # 22h CET
+def test_journee_reaching_evening_stays_journee(client):
+    """A journée party running past 17h stays journée — no bleed into soirée.
+
+    Reverted the previous "double category" behaviour: mixing journée events
+    into the soirée list looked buggy to users (a rock party card with a
+    Journée chip on the Soirée tab). Strict category filter now.
+    """
+    start = datetime(2026, 3, 5, 13, 0, tzinfo=timezone.utc)   # 15h Zurich
+    end = datetime(2026, 3, 5, 21, 0, tzinfo=timezone.utc)     # 22h Zurich
     client.post(
         "/events",
         json=_event_payload(
@@ -97,7 +102,7 @@ def test_journee_reaching_evening_appears_in_soiree_list(client):
     assert [e["title"] for e in j] == ["Long Party"]
 
     s = client.get("/events", params={"date": "2026-03-05", "category": "soiree"}).json()
-    assert [e["title"] for e in s] == ["Long Party"]
+    assert s == []
 
 
 def test_journee_short_daytime_not_in_soiree_list(client):

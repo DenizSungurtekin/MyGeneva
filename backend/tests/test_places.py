@@ -49,25 +49,45 @@ def test_create_and_get_place(client):
     assert resp.json()["name"] == "Motel Campo"
 
 
-def test_list_places_ordered_by_upcoming_events(client):
-    empty = client.post("/places", json=_place_payload(name="Empty Place")).json()
-    busy = client.post("/places", json=_place_payload(name="Busy Place")).json()
+def test_list_places_ordered_by_favorite_count(client, session):
+    from app.models.favorite import Favorite, FavoriteItemType
 
-    # 2 upcoming events at Busy, 0 at Empty.
-    future = datetime.now(timezone.utc) + timedelta(days=3)
-    for i in range(2):
-        client.post(
-            "/events",
-            json=_event_payload_for_place(
-                busy["id"],
-                title=f"Ev{i}",
-                date_start=(future + timedelta(hours=i)).isoformat(),
-            ),
+    popular = client.post("/places", json=_place_payload(name="Popular Place")).json()
+    quiet = client.post("/places", json=_place_payload(name="Quiet Place")).json()
+
+    # 3 users favorited the popular place, 0 for the quiet one.
+    for i in range(3):
+        session.add(
+            Favorite(
+                user_id=f"user-{i}",
+                item_type=FavoriteItemType.place,
+                item_id=popular["id"],
+            )
         )
+    session.commit()
 
     body = client.get("/places").json()
     names = [p["name"] for p in body]
-    assert names == ["Busy Place", "Empty Place"]
+    assert names == ["Popular Place", "Quiet Place"]
+
+
+def test_list_places_search_filters_by_name_and_address(client):
+    client.post("/places", json=_place_payload(name="Motel Campo", address="Route X - Genève"))
+    client.post("/places", json=_place_payload(name="Le Chat Noir", address="rue Vautier - Carouge - Genève"))
+    client.post("/places", json=_place_payload(name="AMR", address="Sud des Alpes - Genève"))
+
+    resp = client.get("/places", params={"search": "motel"})
+    names = [p["name"] for p in resp.json()]
+    assert names == ["Motel Campo"]
+
+    # Search matches the address too.
+    resp = client.get("/places", params={"search": "carouge"})
+    names = [p["name"] for p in resp.json()]
+    assert names == ["Le Chat Noir"]
+
+    # Under the 3-char threshold → filter is ignored (returns everything).
+    resp = client.get("/places", params={"search": "mo"})
+    assert len(resp.json()) == 3
 
 
 def test_place_events_future_only_by_default(client):

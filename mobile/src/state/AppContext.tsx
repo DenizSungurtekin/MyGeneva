@@ -5,6 +5,7 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 
@@ -64,6 +65,10 @@ interface AppState {
 
   searchQuery: string;
   setSearchQuery: (q: string) => void;
+  placeSearchQuery: string;
+  setPlaceSearchQuery: (q: string) => void;
+  favoritesSearchQuery: string;
+  setFavoritesSearchQuery: (q: string) => void;
 
   error: string | null;
 
@@ -121,13 +126,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [favoritePlaces, setFavoritePlaces] = useState<PlaceItem[]>([]);
 
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [placeSearchQuery, setPlaceSearchQuery] = useState<string>('');
+  const [favoritesSearchQuery, setFavoritesSearchQuery] = useState<string>('');
 
   const [error, setError] = useState<string | null>(null);
 
+  // Sequence guard for the /for-you fetch. When the user flicks Soirée →
+  // Journée quickly, the slow response can arrive after the fast one and
+  // overwrite the correct state. Every call bumps the token; results only
+  // apply if they still match the latest one.
+  const feedRequestToken = useRef(0);
+
   const refreshEventFeed = useCallback(async () => {
     const eventCategory = categoryToEventCategory(category);
+    const myToken = ++feedRequestToken.current;
     if (!eventCategory) {
       setEventFeed([]);
+      setEventFeedLoading(false);
       return;
     }
     setEventFeedLoading(true);
@@ -143,12 +158,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
         params.search = trimmed;
       }
       const data = await eventsApi.forYou(params);
+      if (myToken !== feedRequestToken.current) return;   // stale response
       setEventFeed(data);
       setError(null);
     } catch (e) {
+      if (myToken !== feedRequestToken.current) return;
       setError((e as Error).message);
     } finally {
-      setEventFeedLoading(false);
+      if (myToken === feedRequestToken.current) {
+        setEventFeedLoading(false);
+      }
     }
   }, [selectedDay, category, searchQuery]);
 
@@ -165,18 +184,27 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const placesRequestToken = useRef(0);
+
   const refreshPlaces = useCallback(async () => {
+    const myToken = ++placesRequestToken.current;
     setPlacesLoading(true);
     try {
-      const data = await placesApi.list();
+      const trimmed = placeSearchQuery.trim();
+      const params = trimmed.length >= SEARCH_MIN_CHARS ? { search: trimmed } : {};
+      const data = await placesApi.list(params);
+      if (myToken !== placesRequestToken.current) return;
       setPlaces(data);
       setError(null);
     } catch (e) {
+      if (myToken !== placesRequestToken.current) return;
       setError((e as Error).message);
     } finally {
-      setPlacesLoading(false);
+      if (myToken === placesRequestToken.current) {
+        setPlacesLoading(false);
+      }
     }
-  }, []);
+  }, [placeSearchQuery]);
 
   const refreshFavorites = useCallback(async () => {
     setFavoritesLoading(true);
@@ -219,10 +247,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [refreshEventFeed]);
 
   useEffect(() => {
-    refreshRestaurants();
     refreshPlaces();
+  }, [refreshPlaces]);
+
+  useEffect(() => {
+    refreshRestaurants();
     refreshFavorites();
-    // Places, restaurants and favorites don't depend on the selected day.
+    // These don't depend on the selected day or any query.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -314,6 +345,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       favoritePlaces,
       searchQuery,
       setSearchQuery,
+      placeSearchQuery,
+      setPlaceSearchQuery,
+      favoritesSearchQuery,
+      setFavoritesSearchQuery,
       error,
       setScreen,
       setCategory,
@@ -345,6 +380,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       favoriteRestaurants,
       favoritePlaces,
       searchQuery,
+      placeSearchQuery,
+      favoritesSearchQuery,
       error,
       openDetail,
       closeDetail,
