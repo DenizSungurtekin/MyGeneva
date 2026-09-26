@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import List
+from typing import Annotated, List
 
 from pydantic import Field, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
@@ -28,11 +28,15 @@ class Settings(BaseSettings):
         env_file=str(BACKEND_DIR / ".env"),
         env_file_encoding="utf-8",
         extra="ignore",
+        env_ignore_empty=True,
     )
 
     database_url: str = Field(default="")
     poc_user_id: str = Field(default="poc-user")
-    cors_origins: List[str] = Field(
+    # NoDecode: opt out of pydantic-settings' JSON-decoding of complex types.
+    # Railway/Heroku deliver CORS_ORIGINS as a comma-separated string (or empty),
+    # neither of which is valid JSON; without this, Settings() explodes at import.
+    cors_origins: Annotated[List[str], NoDecode] = Field(
         default_factory=lambda: [
             "http://localhost:8081",
             "http://localhost:19006",
@@ -45,6 +49,8 @@ class Settings(BaseSettings):
     @classmethod
     def _split_cors(cls, v):
         if isinstance(v, str):
+            if not v.strip():
+                return []
             return [origin.strip() for origin in v.split(",") if origin.strip()]
         return v
 
