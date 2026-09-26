@@ -26,6 +26,11 @@ export interface ThemeColors {
   ctaText: string;
   overlay: string;
   overlayCircle: string;
+  // Active selection pill (day picker, category tabs). Light uses terracotta
+  // for a warmer feel; dark keeps the plain text/background inversion which
+  // already reads well on the very dark canvas.
+  activePillBg: string;
+  activePillText: string;
 }
 
 export interface ThemeFonts {
@@ -79,6 +84,8 @@ const lightColors: ThemeColors = {
   ctaText: '#FFFFFF',
   overlay: 'rgba(31, 27, 22, 0.35)',
   overlayCircle: 'rgba(255, 255, 255, 0.92)',
+  activePillBg: '#C1622D',
+  activePillText: '#FFFFFF',
 };
 
 const darkColors: ThemeColors = {
@@ -103,6 +110,9 @@ const darkColors: ThemeColors = {
   ctaText: '#17181C',
   overlay: 'rgba(0, 0, 0, 0.55)',
   overlayCircle: 'rgba(30, 32, 36, 0.92)',
+  // Dark keeps the inversion (bright text over dark bg → dark bg over bright bg).
+  activePillBg: '#F2F3F5',
+  activePillText: '#17181C',
 };
 
 const lightFonts: ThemeFonts = {

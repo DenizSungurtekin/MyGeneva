@@ -86,20 +86,18 @@ def list_events(
     session: Session = Depends(get_session),
 ) -> List[Event]:
     query = select(Event)
+    # Apply day + category filters first (they carry the double-cat / 8h rules).
+    if day is not None:
+        query = _apply_day_filter(query, day, category)
+    elif category is not None:
+        query = query.where(Event.category == category)
+    # Then narrow further with the search keyword if it's long enough.
     search_active = search is not None and len(search.strip()) >= SEARCH_MIN_CHARS
     if search_active:
         pattern = f"%{search.strip()}%"
         query = query.where(
             Event.title.ilike(pattern) | Event.description.ilike(pattern)
         )
-        if category is not None:
-            query = query.where(Event.category == category)
-        # Search is global — deliberately ignores the day filter so users can
-        # find an event across the whole scraped window with one keyword.
-    elif day is not None:
-        query = _apply_day_filter(query, day, category)
-    elif category is not None:
-        query = query.where(Event.category == category)
     query = query.order_by(Event.date_start.asc())
     return list(session.exec(query).all())
 

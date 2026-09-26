@@ -86,7 +86,7 @@ function isEventInFuture(event: EventItem): boolean {
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [screen, setScreen] = useState<ScreenName>('accueil');
-  const [category, setCategory] = useState<CategoryKey>('soiree');
+  const [category, setCategory] = useState<CategoryKey>('journee');
   const [selectedDay, setSelectedDay] = useState<Date>(() => {
     const now = new Date();
     now.setHours(0, 0, 0, 0);
@@ -227,6 +227,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     eventsApi
       .list({
         search: trimmed,
+        date: toISODate(selectedDay),
         ...(eventCategory ? { category: eventCategory } : {}),
       })
       .then((res) => {
@@ -241,7 +242,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [listSearchQuery, category]);
+  }, [listSearchQuery, category, selectedDay]);
 
   useEffect(() => {
     refreshRestaurants();

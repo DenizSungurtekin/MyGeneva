@@ -319,15 +319,19 @@ def test_search_ignored_below_min_chars(client):
     assert len(resp.json()) == 1     # everything returned, filter not applied
 
 
-def test_search_ignores_day_filter(client):
-    """Search is global — a matching event on another day still shows up."""
+def test_search_respects_day_filter(client):
+    """Search narrows the current day + category view, not the whole DB."""
     day1 = "2026-05-01"
     day2 = "2026-05-02"
     client.post(
         "/events",
         json=_event_payload(title="Sven at Motel", date_start=f"{day1}T21:00:00+00:00", date_end=None),
     )
+    # Query on day2: the day1 event is out of scope.
     resp = client.get("/events", params={"date": day2, "search": "sven"})
+    assert resp.json() == []
+    # Query on day1: the day1 event matches.
+    resp = client.get("/events", params={"date": day1, "search": "sven"})
     titles = [e["title"] for e in resp.json()]
     assert titles == ["Sven at Motel"]
 

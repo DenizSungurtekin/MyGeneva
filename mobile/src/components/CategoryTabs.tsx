@@ -7,7 +7,7 @@ import { categoryLabel, CategoryKey, radius, spacing, useTheme } from '../theme'
 // Backend endpoints, model, and detail path stay in place so the tab can be
 // re-enabled with a single line when we bring restaurants back (probably as
 // "restaurants near this event" contextual, not a standalone browse).
-const ORDER: CategoryKey[] = ['soiree', 'journee'];
+const ORDER: CategoryKey[] = ['journee', 'soiree'];
 
 interface Props {
   value: CategoryKey;
@@ -39,15 +39,15 @@ export function CategoryTabs({ value, onChange, paddingHorizontal = spacing.lg }
           backgroundColor: theme.colors.soft,
         },
         tabActive: {
-          backgroundColor: theme.colors.text,
-          borderColor: theme.colors.text,
+          backgroundColor: theme.colors.activePillBg,
+          borderColor: theme.colors.activePillBg,
         },
         label: {
           ...theme.text.metaStrong,
           color: theme.colors.text,
         },
         labelActive: {
-          color: theme.colors.background,
+          color: theme.colors.activePillText,
         },
       }),
     [theme, paddingHorizontal],

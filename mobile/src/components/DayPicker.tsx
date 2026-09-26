@@ -49,15 +49,15 @@ export function DayPicker({ value, onChange, before = 3, after = 7 }: Props) {
           alignItems: 'center',
         },
         pillActive: {
-          backgroundColor: theme.colors.text,
-          borderColor: theme.colors.text,
+          backgroundColor: theme.colors.activePillBg,
+          borderColor: theme.colors.activePillBg,
         },
         weekday: {
           ...theme.text.eyebrow,
           color: theme.colors.textMuted,
         },
         weekdayActive: {
-          color: theme.colors.background,
+          color: theme.colors.activePillText,
         },
         day: {
           ...theme.text.h3,
@@ -66,7 +66,7 @@ export function DayPicker({ value, onChange, before = 3, after = 7 }: Props) {
           marginTop: 2,
         },
         dayActive: {
-          color: theme.colors.background,
+          color: theme.colors.activePillText,
         },
       }),
     [theme],
