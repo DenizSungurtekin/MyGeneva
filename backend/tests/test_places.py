@@ -148,3 +148,45 @@ def test_favorite_place(client):
 def test_favorite_place_not_found(client):
     resp = client.post("/favorites", json={"item_type": "place", "item_id": 9999})
     assert resp.status_code == 404
+
+
+def test_refresh_place_applies_enricher_result(client, monkeypatch):
+    """POST /places/{id}/refresh should call the enricher and apply the result."""
+    from pipeline.enrichers import google_places
+
+    place = client.post("/places", json=_place_payload(name="Stale name")).json()
+
+    def fake_find(query, **kwargs):
+        return "ChIJfake"
+
+    def fake_details(gpid, **kwargs):
+        return google_places.PlaceEnrichment(
+            google_place_id=gpid,
+            name="Fresh Name",
+            address="Fresh Address - Genève",
+            latitude=46.20,
+            longitude=6.14,
+            description="Belle description en français.",
+            image_url="https://example.com/photo.jpg",
+        )
+
+    monkeypatch.setattr(google_places, "find_place_id", fake_find)
+    monkeypatch.setattr(google_places, "fetch_place_details", fake_details)
+
+    resp = client.post(f"/places/{place['id']}/refresh")
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["google_place_id"] == "ChIJfake"
+    assert body["name"] == "Fresh Name"
+    assert body["description"] == "Belle description en français."
+    assert body["image_url"] == "https://example.com/photo.jpg"
+
+
+def test_refresh_place_404_when_no_match(client, monkeypatch):
+    from pipeline.enrichers import google_places
+
+    place = client.post("/places", json=_place_payload(name="Unknown place")).json()
+    monkeypatch.setattr(google_places, "find_place_id", lambda *a, **kw: None)
+
+    resp = client.post(f"/places/{place['id']}/refresh")
+    assert resp.status_code == 404

@@ -116,6 +116,84 @@ def update_place(
     return place
 
 
+@router.post("/{place_id}/refresh", response_model=PlaceRead)
+def refresh_place_from_google(
+    place_id: int,
+    session: Session = Depends(get_session),
+) -> Place:
+    """Re-fetch this place's metadata from Google Places (name, address,
+    coords, description, first photo). Requires MYGENEVA_GOOGLE_MAPS_KEY.
+
+    - If we already have a google_place_id, we go straight to Place Details.
+    - Otherwise we run a SearchText using the place's current name+address
+      to find the id, then Details.
+
+    Idempotent-ish: overwrites the fields Google returned, preserves the
+    others (source, external_id, etc.). Meant to be triggered manually via
+    curl or a future admin surface.
+    """
+    place = session.get(Place, place_id)
+    if place is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Place not found")
+
+    # Imported lazily so /places endpoints don't pull the enricher (and its
+    # deep-translator transitive deps) unless someone hits /refresh.
+    try:
+        from pipeline.enrichers.google_places import (
+            fetch_place_details,
+            find_place_id,
+            GooglePlacesConfigError,
+        )
+    except ImportError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Enricher not available: {exc}",
+        )
+
+    try:
+        gpid = place.google_place_id
+        if not gpid:
+            query = f"{place.name} {place.address or ''}".strip()
+            gpid = find_place_id(query, location_bias_lat=46.204, location_bias_lng=6.143)
+        if not gpid:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"No Google Places match found for {place.name!r}",
+            )
+        details = fetch_place_details(gpid)
+    except GooglePlacesConfigError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
+        )
+    if details is None:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Google Places API returned an unexpected error",
+        )
+
+    # Apply — same semantics as the CLI, overwrite only when Google gave us
+    # something. Preserves manually-curated fields on missing keys.
+    place.google_place_id = details.google_place_id
+    if details.name:
+        place.name = details.name
+    if details.address:
+        place.address = details.address
+    if details.latitude is not None:
+        place.latitude = details.latitude
+    if details.longitude is not None:
+        place.longitude = details.longitude
+    if details.description:
+        place.description = details.description
+    if details.image_url:
+        place.image_url = details.image_url
+    place.updated_at = _utcnow()
+    session.add(place)
+    session.commit()
+    session.refresh(place)
+    return place
+
+
 @router.delete("/{place_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_place(place_id: int, session: Session = Depends(get_session)) -> None:
     place = session.get(Place, place_id)

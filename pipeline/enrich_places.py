@@ -38,8 +38,10 @@ from pipeline.enrichers.google_places import (
 GENEVA_LAT = 46.204
 GENEVA_LNG = 6.143
 
-# Google's terms allow a rate up to ~50 QPS. We stay well below for safety.
-INTER_CALL_SLEEP_S = 0.3
+# Places API tolerates ~50 QPS, but the translation step (deep-translator via
+# Google's free endpoint) has a stricter 5-req/sec unofficial cap. Sleep long
+# enough that a translation-per-place still leaves headroom.
+INTER_CALL_SLEEP_S = 1.0
 
 log = logging.getLogger("enrich_places")
 

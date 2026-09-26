@@ -26,6 +26,57 @@ API_BASE = "https://places.googleapis.com/v1"
 LANGUAGE = "fr"
 
 
+def _translate_to_french(text: str, source_lang: str) -> Optional[str]:
+    """Translate `text` from source_lang to fr using deep-translator.
+
+    Tries Google's free endpoint first (best quality). Falls back to MyMemory
+    when Google rate-limits us (5 req/sec cap, aggressive) — MyMemory's free
+    tier tolerates 10k characters per day per IP, plenty for our 30-odd
+    places. Returns None only when both providers fail; caller then keeps the
+    original source-language text.
+    """
+    if not text:
+        return None
+    try:
+        from deep_translator import GoogleTranslator, MyMemoryTranslator
+        from deep_translator.exceptions import TooManyRequests
+    except ImportError as exc:
+        log.warning("deep-translator not installed: %s", exc)
+        return None
+
+    # MyMemory uses BCP-47-ish locale tags (e.g. "en-GB" not "en-EN").
+    # Map the common ones the Google Places API actually returns.
+    _mymemory_source_map = {
+        "en": "en-GB",
+        "de": "de-DE",
+        "it": "it-IT",
+        "es": "es-ES",
+        "pt": "pt-PT",
+    }
+    mymemory_source = _mymemory_source_map.get(source_lang, "en-GB")
+    mymemory_target = "fr-FR"
+
+    # Try Google.
+    try:
+        translated = GoogleTranslator(source=source_lang, target="fr").translate(text)
+        if translated:
+            return translated
+    except TooManyRequests:
+        log.info("Google rate-limited, falling back to MyMemory")
+    except Exception as exc:  # noqa: BLE001
+        log.info("Google translate failed (%s), trying MyMemory", exc)
+
+    # Fall back to MyMemory.
+    try:
+        translated = MyMemoryTranslator(
+            source=mymemory_source, target=mymemory_target
+        ).translate(text)
+        return translated or None
+    except Exception as exc:  # noqa: BLE001 — best-effort
+        log.warning("MyMemory translate failed: %s", exc)
+        return None
+
+
 class GooglePlacesConfigError(RuntimeError):
     """Raised when the API key is missing or malformed."""
 
@@ -149,13 +200,22 @@ def fetch_place_details(
                     f"{API_BASE}/{photo_name}/media"
                     f"?maxWidthPx={photo_max_width_px}&key={key}"
                 )
+        description_text = editorial.get("text")
+        description_lang = editorial.get("languageCode") or ""
+        # Places sometimes returns editorialSummary in English even when we
+        # ask for fr. Translate on the fly so what lands in the DB is always
+        # French (falls back to the original if translation fails).
+        if description_text and description_lang and description_lang != "fr":
+            translated = _translate_to_french(description_text, description_lang)
+            if translated:
+                description_text = translated
         return PlaceEnrichment(
             google_place_id=google_place_id,
             name=display.get("text"),
             address=p.get("formattedAddress"),
             latitude=loc.get("latitude"),
             longitude=loc.get("longitude"),
-            description=editorial.get("text"),
+            description=description_text,
             image_url=photo_url,
         )
     finally:

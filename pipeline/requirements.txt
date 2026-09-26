@@ -3,3 +3,4 @@
 #   pip install -r pipeline/requirements.txt
 beautifulsoup4>=4.13.0
 lxml>=5.3.0
+deep-translator>=1.11.0
